@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { -webkit-text-size-adjust: 100%; }
+body { @apply bg-paper text-ink font-sans antialiased; }
+
+/* Visible keyboard focus everywhere */
+:focus-visible { outline: 4px solid #f59e0b; outline-offset: 3px; border-radius: 6px; }
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center gap-3 min-h-tap px-6 py-3 rounded-xl font-bold text-base text-center transition-colors disabled:opacity-60 disabled:cursor-not-allowed; }
+  .btn-primary { @apply btn bg-brand text-white hover:bg-[#093b59] active:bg-[#072f48]; }
+  .btn-secondary { @apply btn bg-white text-brand border-2 border-brand hover:bg-sky-50; }
+  .btn-danger { @apply btn bg-scam text-white hover:bg-[#a31818]; }
+  .btn-quiet { @apply btn bg-transparent text-brand underline underline-offset-4 hover:bg-sky-50; }
+  .field { @apply w-full rounded-xl border-2 border-slate-400 bg-white px-4 py-3 text-base text-ink placeholder:text-slate-500 focus:border-brand; }
+  .link { @apply text-brand underline underline-offset-4 font-bold; }
+}
+
+mark.flag { background: #fde68a; color: #0f1f2e; text-decoration: underline wavy #b45309; text-underline-offset: 4px; border-radius: 4px; padding: 0 2px; }
+mark.flag.hot { background: #fecaca; text-decoration-color: #c81e1e; }
+
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }

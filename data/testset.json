@@ -1,0 +1,284 @@
+[
+ {
+  "id": "s01",
+  "text": "Eh bro, your bank account kena locked already. Click here to unlock: dbs-sg-secure.top/login",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s02",
+  "text": "Hi, I'm from the bank. Need your OTP to verify your account.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s03",
+  "text": "Your parcel kena stuck, click here to release: sg-parcel-track.xyz/r",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s04",
+  "text": "Eh, you need to pay now lah or your account will be blocked.",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s05",
+  "text": "URGENT: Your SingPass has been suspended. Verify within 24 hours at singpass-verify.cc or your account will be terminated.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s06",
+  "text": "This is Officer Tan from MAS. Your NRIC is linked to money laundering. Do not tell anyone. Transfer your savings to the safe account now.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s07",
+  "text": "Congrats lah! You won $5000 lucky draw. Claim your prize at bit.ly/3xYz, processing fee $50 only.",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s08",
+  "text": "Hi mum, this is my new number. Phone spoil. Can you help me pay $1800 to this account first? Will pay you back tmr.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s09",
+  "text": "Wah boss, part-time job can earn $300 per day, just like and follow YouTube videos. WhatsApp me to start.",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s10",
+  "text": "Please install the app from this link: update-bank.com/secure.apk to protect your account. Our officer will guide you with AnyDesk.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s11",
+  "text": "Your DBS card ending 1234 kena suspend liao. Pls key in your PIN and CVV at dbs-card-reactivate.sbs to reactivate leh.",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s12",
+  "text": "IRAS: You have a tax refund of $1,240. Claim now at iras-refund-sg.icu before it expires today.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s13",
+  "text": "Dear customer, your SingPost parcel is held. Pay redelivery fee $2.99 at singpost-redeliver.top",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s14",
+  "text": "Anyone interested in crypto investment, guaranteed returns 30% per month, risk-free, join my Telegram group now",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s15",
+  "text": "你的银行户口被冻结了,请马上点击链接验证 bank-verify-sg.top",
+  "lang": "mixed",
+  "truth": "scam"
+ },
+ {
+  "id": "s16",
+  "text": "Encik, akaun bank anda akan disekat. Sila klik pautan ini dan masukkan OTP anda: maybank-sg-verify.xyz",
+  "lang": "mixed",
+  "truth": "scam"
+ },
+ {
+  "id": "s17",
+  "text": "Hello this is Grab support, your account got problem. Send me the code SMS you received, I help you fix lah.",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s18",
+  "text": "Police here. You are involved in a criminal case. Call this number 6100 0000 immediately or warrant will be issued.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s19",
+  "text": "I'm from the bank. Your account got suspicious login. Please tell me the 6-digit number we just SMS you.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "s20",
+  "text": "Eh your Shopee order got problem, pls click shopee-refund-sg.vip to get refund or order will be cancelled",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s21",
+  "text": "Boss I'm interested in your listing on Carousell, I will pay via this link, you key in your card number and OTP to receive money.",
+  "lang": "singlish",
+  "truth": "scam"
+ },
+ {
+  "id": "s22",
+  "text": "Dear valued customer, we detected unusual activity. Log in at ocbc-secure-login.cfd to confirm your identity.",
+  "lang": "english",
+  "truth": "scam"
+ },
+ {
+  "id": "l01",
+  "text": "Eh bro, dinner at 7 lah, I already book the table at the usual place.",
+  "lang": "singlish",
+  "truth": "legit"
+ },
+ {
+  "id": "l02",
+  "text": "Can help me check anot? I want to meet at Jurong East MRT at 3pm.",
+  "lang": "singlish",
+  "truth": "legit"
+ },
+ {
+  "id": "l03",
+  "text": "Mum, I reach home already. Don't worry lor.",
+  "lang": "singlish",
+  "truth": "legit"
+ },
+ {
+  "id": "l04",
+  "text": "Your OTP is 482913. Do not share this code with anyone, including DBS staff. Valid for 5 minutes.",
+  "lang": "english",
+  "truth": "legit"
+ },
+ {
+  "id": "l05",
+  "text": "Reminder: your dental appointment is tomorrow at 10am at Clementi clinic. Reply C to confirm.",
+  "lang": "english",
+  "truth": "legit"
+ },
+ {
+  "id": "l06",
+  "text": "Wah the new hawker centre got really nice char kway teow leh, you want go this weekend?",
+  "lang": "singlish",
+  "truth": "legit"
+ },
+ {
+  "id": "l07",
+  "text": "Hi, your Grab ride is arriving in 2 minutes. Driver: Ah Kow, SJK1234A.",
+  "lang": "english",
+  "truth": "legit"
+ },
+ {
+  "id": "l08",
+  "text": "Lunch tmr? I pay lah, you pay next time.",
+  "lang": "singlish",
+  "truth": "legit"
+ },
+ {
+  "id": "l09",
+  "text": "Meeting moved to 3pm. Zoom link: https://zoom.us/j/123456789",
+  "lang": "english",
+  "truth": "legit"
+ },
+ {
+  "id": "l10",
+  "text": "I kena scolded by boss today sia, so jialat.",
+  "lang": "singlish",
+  "truth": "legit"
+ },
+ {
+  "id": "l11",
+  "text": "Please remember to bring your NRIC and the form to the polyclinic tomorrow.",
+  "lang": "english",
+  "truth": "legit"
+ },
+ {
+  "id": "l12",
+  "text": "Do not share your OTP or password with anyone. DBS will never ask for it. Stay safe from scams.",
+  "lang": "english",
+  "truth": "legit"
+ },
+ {
+  "id": "l13",
+  "text": "Your parcel has been delivered to your doorstep at Blk 123. Thank you for shopping with us.",
+  "lang": "english",
+  "truth": "legit"
+ },
+ {
+  "id": "l14",
+  "text": "Eh bro your account kena locked meh? Last time I also kena, just call the bank hotline at the back of your card lah.",
+  "lang": "singlish",
+  "truth": "legit"
+ },
+ {
+  "id": "l15",
+  "text": "明天晚上一起去吃饭好吗?我订了位子。",
+  "lang": "mixed",
+  "truth": "legit"
+ },
+ {
+  "id": "l16",
+  "text": "Boleh kita jumpa esok di kedai kopi? Saya belanja.",
+  "lang": "mixed",
+  "truth": "legit"
+ },
+ {
+  "id": "a01",
+  "text": "Can help me verify this link anot?",
+  "lang": "singlish",
+  "truth": "ambiguous"
+ },
+ {
+  "id": "a02",
+  "text": "Hi, is this still available?",
+  "lang": "english",
+  "truth": "ambiguous"
+ },
+ {
+  "id": "a03",
+  "text": "Your account has been updated. Please check.",
+  "lang": "english",
+  "truth": "ambiguous"
+ },
+ {
+  "id": "a04",
+  "text": "Please call me back urgently",
+  "lang": "english",
+  "truth": "ambiguous"
+ },
+ {
+  "id": "a05",
+  "text": "Click here to see my holiday photos: https://photos.app.goo.gl/abc123",
+  "lang": "english",
+  "truth": "ambiguous"
+ },
+ {
+  "id": "a06",
+  "text": "Pls transfer the deposit to my PayNow 9123 4567 for the room rental, I will hold the room for you.",
+  "lang": "english",
+  "truth": "ambiguous"
+ },
+ {
+  "id": "a07",
+  "text": "Can you transfer me the $20 for the movie ticket? I paid first.",
+  "lang": "english",
+  "truth": "ambiguous"
+ },
+ {
+  "id": "a08",
+  "text": "Notice from your bank: login from new device. If this wasn't you, open your banking app.",
+  "lang": "english",
+  "truth": "ambiguous"
+ },
+ {
+  "id": "a09",
+  "text": "Aunty, the school fees need to be paid by Friday, I attach the invoice from the school office.",
+  "lang": "english",
+  "truth": "ambiguous"
+ }
+]

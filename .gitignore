@@ -1,0 +1,11 @@
+node_modules
+dist
+.vite
+*.local
+.DS_Store
+
+# Secrets — never commit
+telegram-bot/node_modules
+telegram-bot/serviceAccountKey.json
+telegram-bot/.env
+.env

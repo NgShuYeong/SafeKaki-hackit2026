@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{db}/documents {
+    // Each user's circle + telegram link: owner only.
+    match /users/{uid} { allow read, write: if request.auth != null && request.auth.uid == uid; }
+
+    // Scam wall. PROTOTYPE rules: anyone signed in can report; moderation is client-side.
+    // Before real launch, add a moderator claim and restrict approve/delete to it.
+    match /alerts/{id} {
+      allow read: if true;
+      allow create: if request.auth != null && request.resource.data.approved == false;
+      allow update, delete: if request.auth != null;
+    }
+
+    // Ask-my-family: link holder (family, no login) can read one doc and set only "reply".
+    match /asks/{id} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.auth != null;
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reply']);
+    }
+  }
+}
