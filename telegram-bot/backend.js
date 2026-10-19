@@ -5,6 +5,7 @@ import { analyzeMessage } from '../server/core/analyze.js';
 import { buildReportDraft } from '../server/core/report.js';
 import { findNamesWithAi } from '../server/core/redactNames.js';
 import { readImage, ImageError } from '../server/core/readImage.js';
+import { summarizeRoom } from '../server/core/summarize.js';
 
 export function makeBackend({ apiUrl = process.env.SAFEKAKI_API_URL, secret = process.env.BOT_SHARED_SECRET, fetchImpl = fetch } = {}) {
   if (!apiUrl) {
@@ -17,6 +18,7 @@ export function makeBackend({ apiUrl = process.env.SAFEKAKI_API_URL, secret = pr
         try { return { ok: true, ...(await readImage(image)) }; }
         catch (e) { return { ok: false, code: e.code || 'internal', error: e instanceof ImageError ? e.message : 'Sorry, I could not read that picture.' }; }
       },
+      summarize: async (room) => ({ ok: true, summary: await summarizeRoom(room) }),
     };
   }
   const base = apiUrl.replace(/\/$/, '');
@@ -32,5 +34,7 @@ export function makeBackend({ apiUrl = process.env.SAFEKAKI_API_URL, secret = pr
     draft: (input) => post('/api/report/draft', input, input.clientId),
     findNames: (input) => post('/api/share/names', { text: input.text }, input.clientId),
     readImage: (input) => post('/api/read-image', { image: input.image.toString('base64') }, input.clientId),
+    // Room summaries run on the bot's own machine (the chat never leaves the bot process).
+    summarize: async (room) => ({ ok: true, summary: await summarizeRoom(room) }),
   };
 }

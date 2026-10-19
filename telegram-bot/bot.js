@@ -8,6 +8,10 @@ import { SHARED_INFO_OPTIONS } from '../server/core/report.js';
 import { RESOURCES } from '../shared/resources.js';
 import * as F from './format.js';
 import { redactLocal } from '../shared/redact.js';
+import { createRooms, defangLinks } from './rooms.js';
+import { summarizeRoom } from '../server/core/summarize.js';
+
+const DEFAULT_DATA_DIR = process.env.SAFEKAKI_DATA_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 
 const STATE_TTL_MS = 30 * 60 * 1000;
 const COMMANDS = [
@@ -15,12 +19,16 @@ const COMMANDS = [
   { command: 'report', description: 'Prepare a scam report' },
   { command: 'share', description: 'Hide names and numbers so you can warn family' },
   { command: 'scammed', description: 'Urgent help: I already shared a code or sent money' },
+  { command: 'discuss', description: 'Open a chat room so Kakis can help you decide' },
+  { command: 'kaki', description: 'Become a Kaki: help others spot scams' },
+  { command: 'rooms', description: 'Kakis: see rooms that need help' },
+  { command: 'leave', description: 'Leave the discussion room' },
   { command: 'tips', description: 'How to spot scams' },
   { command: 'privacy', description: 'What happens to my messages' },
   { command: 'cancel', description: 'Delete what you sent me and start over' },
 ];
 
-export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, apiBase = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org', allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean), ratePerMin = Number(process.env.BOT_RATE_LIMIT_PER_MIN) || 8, log = console.log } = {}) {
+export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, apiBase = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org', allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean), ratePerMin = Number(process.env.BOT_RATE_LIMIT_PER_MIN) || 8, log = console.log, dataDir = DEFAULT_DATA_DIR, roomOptions = {} } = {}) {
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN is missing');
   // Two limits: "checks" are actions that analyse a message (and may cost AI money);
   // "taps" are cheap button presses and plain chat, with a much higher limit just to stop spam.
@@ -33,6 +41,9 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     return true;
   }
   const states = new Map(); // chatId -> { message, analysis, details, skipped:Set, mode, pending, ts }
+  const rooms = createRooms({ dataDir, ...roomOptions });
+  const roomOpenLimiter = createLimiter({ windowMs: 60 * 60_000, max: 3 }); // 3 new rooms an hour per person
+  const roomChatLimiter = createLimiter({ windowMs: 60_000, max: 20 }); // 20 room messages a minute per person
 
   // ---- Telegram API (official Bot API over HTTPS) ----
   async function tg(method, payload = {}) {
@@ -84,7 +95,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     if (!r.ok) return send(chatId, r.code === 'rate_limited' || r.code === 'busy' ? esc2(r.error) : r.code === 'invalid_input' ? esc2(r.error) : F.GENERIC_ERROR);
     const a = r.analysis;
     touch(chatId, { message: a.original, analysis: a, details: { category: a.scamCategory, riskLevel: a.riskLevel, forwardedFrom: forwardedFrom || '', clickedLink: a.victimState.clickedLink ? true : undefined }, skipped: new Set(), mode: null, pending: null });
-    const rows = [[{ text: '📝 Prepare a report', callback_data: 'rp:start' }], [{ text: '🔒 Warn family safely', callback_data: 'sh:go' }]];
+    const rows = [[{ text: '📝 Prepare a report', callback_data: 'rp:start' }], [{ text: '🔒 Warn family safely', callback_data: 'sh:go' }], [{ text: '🗣 Discuss with Kakis', callback_data: 'rm:open' }]];
     if (!a.urgent) rows.push([{ text: '🚨 I already shared info or sent money', callback_data: 'urgent:menu' }]);
     await send(chatId, F.formatAnalysis(a, { degraded: r.meta?.degraded }), kb(rows));
   }
@@ -148,6 +159,162 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     ]));
   }
 
+  // ---- Kaki discussion rooms ----
+  // A room lives inside each person's private chat with the bot; the bot copies messages between them.
+  const roomMenu = (code) => kb([[{ text: '🗳 Vote', callback_data: `rm:vmenu:${code}` }, { text: '⚠️ Report someone', callback_data: `rm:repmenu:${code}` }], [{ text: '🚪 Leave room', callback_data: 'rm:leave' }]]);
+  const voteRow = (code, prefix) => [[{ text: '🚩 Scam', callback_data: `${prefix}:${code}:scam` }, { text: '🤔 Not sure', callback_data: `${prefix}:${code}:unsure` }, { text: '✅ Looks real', callback_data: `${prefix}:${code}:real` }]];
+  const cleanForRoom = (text) => defangLinks(redactLocal(text).text);
+  async function tellRoom(room, html, exceptId) {
+    for (const id of room.members.keys()) if (id !== String(exceptId)) await send(id, html);
+  }
+
+  async function roomDraft(chatId, userId) {
+    if (rooms.roomOf(userId)) return send(chatId, 'You are already in a discussion room. Type /leave first.');
+    const s = getState(chatId);
+    if (!s?.message) { touch(chatId, { mode: 'await_message_for_room' }); return send(chatId, '🗣 Send or forward me the message you want to discuss, or a screenshot of it. I will check it first, then you can open a room.'); }
+    let result = redactLocal(s.message);
+    try {
+      const r = await backend.findNames({ text: result.text, clientId: userId });
+      if (r?.ok && r.names?.length) result = redactLocal(s.message, { extraNames: r.names });
+    } catch { /* rules-only is fine */ }
+    const text = defangLinks(result.text);
+    touch(chatId, { roomDraft: text });
+    return send(chatId, F.formatRoomPreview(text, result.items), kb([[{ text: '✅ Open the room', callback_data: 'rm:post' }, { text: 'Cancel', callback_data: 'rm:cancel' }]]));
+  }
+
+  async function openRoom(chatId, userId) {
+    const s = getState(chatId);
+    if (!s?.roomDraft) return send(chatId, 'That has expired. Please send the message again, then tap 🗣 Discuss with Kakis.');
+    if (rooms.roomOf(userId)) return send(chatId, 'You are already in a discussion room. Type /leave first.');
+    const helpers = rooms.pickHelpers(userId);
+    if (!helpers.length) return send(chatId, 'Sorry, no Kakis are free right now. Please try again later, or call the ScamShield Helpline 1799 to check the message with them.');
+    const rl = roomOpenLimiter.check(`r:${userId}`);
+    if (!rl.allowed) return send(chatId, 'You have opened a few rooms already. Please wait a while before opening another one.');
+    const a = s.analysis || {};
+    const room = rooms.create({ ownerId: userId, original: s.roomDraft, riskLevel: a.riskLevel || 'insufficient_evidence', category: a.scamCategory, headline: a.headline });
+    touch(chatId, { roomDraft: null });
+    await send(chatId, F.formatRoomWelcome(room, 'Asker', 1) + `\n\n🔔 I pinged ${helpers.length} ${helpers.length === 1 ? 'Kaki' : 'Kakis'}. I will tell you when someone joins.`, roomMenu(room.code));
+    for (const id of helpers) await send(id, F.formatRoomPing(room), kb([[{ text: '🙋 Join', callback_data: `rm:join:${room.code}` }]]));
+  }
+
+  async function joinRoom(chatId, userId, code) {
+    if (!rooms.isHelper(userId)) return send(chatId, 'Only Kakis can join rooms. Tap /kaki to become one.');
+    const r = rooms.join(code, userId);
+    if (!r.ok) {
+      const why = { gone: 'That room has already closed. Thank you for offering to help!', full: 'That room is full. Thank you for offering to help!', busy: 'You are already in another room. Type /leave first.', removed: 'You cannot rejoin this room.' };
+      return send(chatId, why[r.reason]);
+    }
+    const { room, alias } = r;
+    await send(chatId, F.formatRoomWelcome(room, alias, room.members.size), roomMenu(room.code));
+    await tellRoom(room, F.roomNotice(`${alias} ${r.rejoined ? 'came back' : 'joined'}. ${room.members.size} people are here.`), userId);
+  }
+
+  async function askBeforeLeaving(chatId, userId) {
+    const room = rooms.roomOf(userId);
+    if (!room) return send(chatId, 'You are not in a discussion room.');
+    if (room.votes.has(String(userId))) return leaveRoom(chatId, userId);
+    return send(chatId, '🗳 Before you go, what do you think?', kb([...voteRow(room.code, 'rm:bye'), [{ text: 'Leave without voting', callback_data: `rm:bye:${room.code}:skip` }, { text: 'Stay', callback_data: 'rm:stay' }]]));
+  }
+
+  async function leaveRoom(chatId, userId) {
+    const left = rooms.leave(userId);
+    if (!left) return send(chatId, 'You are not in a discussion room.');
+    const { room, alias, empty } = left;
+    await send(chatId, `🚪 You left room #${room.code}. I will send you the summary when the room closes.`);
+    if (empty) return closeRoom(room.code, 'empty');
+    await tellRoom(room, F.roomNotice(`${alias} left. ${room.members.size} ${room.members.size === 1 ? 'person is' : 'people are'} still here.`));
+  }
+
+  async function closeRoom(code, reason) {
+    const snap = rooms.close(code);
+    if (!snap) return;
+    let summary;
+    try {
+      const r = backend.summarize ? await backend.summarize(snap) : { ok: true, summary: await summarizeRoom(snap) };
+      summary = r?.ok ? r.summary : null;
+    } catch { summary = null; }
+    if (!summary) summary = await summarizeRoom(snap, { cfg: { apiKey: '' } }); // rules-only fallback
+    snap.transcript = []; // the chat log is not kept
+    const text = F.formatRoomSummary(code, reason, summary);
+    for (const id of snap.recipients) await send(id, text);
+    rooms.saveSummary({ code, closedAt: new Date().toISOString(), reason, message: snap.original, riskLevel: snap.riskLevel, category: snap.category || null, votes: summary.counts, points: summary.points, method: summary.method, messages: summary.messageCount, people: snap.peopleCount });
+  }
+
+  async function checkRooms() {
+    for (const { room, reason } of rooms.expired()) {
+      await tellRoom(room, F.roomNotice(reason === 'max' ? 'This room has reached the 1-hour limit and is closing now.' : 'This room has been quiet for 20 minutes and is closing now.'));
+      await closeRoom(room.code, reason).catch((e) => log(`room close failed: ${e.message}`));
+    }
+  }
+  const roomTimer = setInterval(() => { checkRooms().catch(() => {}); }, 30_000);
+  roomTimer.unref?.();
+
+  async function roomMessage(m, chatId, userId, text, cmd) {
+    const room = rooms.roomOf(userId);
+    if (cmd) {
+      if (cmd === '/leave') return askBeforeLeaving(chatId, userId);
+      if (cmd === '/end') {
+        if (room.ownerId !== String(userId)) return send(chatId, 'Only the person who opened the room can close it. You can /leave any time.');
+        await tellRoom(room, F.roomNotice('The asker closed the room.'), userId);
+        return closeRoom(room.code, 'ended');
+      }
+      if (cmd === '/privacy') return send(chatId, F.PRIVACY);
+      return send(chatId, `You are in room #${room.code}. Anything you type goes to the room. To do something else, type /leave first.`, roomMenu(room.code));
+    }
+    const rl = roomChatLimiter.check(`c:${userId}`);
+    if (!rl.allowed) return send(chatId, `You are typing a bit fast. Please wait ${rl.retryAfterSec} seconds.`);
+    const said = rooms.say(userId, cleanForRoom(text));
+    for (const id of said.to) await send(id, F.roomLine(said.alias, said.text));
+  }
+
+  async function roomCallback(q, chatId, userId) {
+    const [, act, code, arg] = String(q.data).split(':');
+    if (act === 'open') { if (await tooFast(chatId, userId)) return; return roomDraft(chatId, userId); }
+    if (act === 'post') return openRoom(chatId, userId);
+    if (act === 'cancel') { touch(chatId, { roomDraft: null }); return send(chatId, 'OK, I did not open a room.'); }
+    if (act === 'join') return joinRoom(chatId, userId, code);
+    if (act === 'leave') return askBeforeLeaving(chatId, userId);
+    if (act === 'stay') return send(chatId, 'OK, you are still in the room.');
+    if (act === 'vmenu') return send(chatId, '🗳 What do you think? You can change your vote until the room closes.', kb(voteRow(code, 'rm:vote')));
+    if (act === 'vote' || act === 'bye') {
+      if (arg !== 'skip') {
+        const ok = rooms.vote(code, userId, arg);
+        if (!ok && act === 'vote') return send(chatId, 'That room has closed.');
+        if (ok && act === 'vote') await send(chatId, `Thanks, your vote is in: ${{ scam: '🚩 Scam', unsure: '🤔 Not sure', real: '✅ Looks real' }[arg]}.`);
+      }
+      if (act === 'bye' && rooms.roomOf(userId)?.code === code) return leaveRoom(chatId, userId);
+      return;
+    }
+    if (act === 'repmenu') {
+      const room = rooms.get(code);
+      if (!room || !room.members.has(String(userId))) return send(chatId, 'That room has closed.');
+      const names = [...room.members.entries()].filter(([id]) => id !== String(userId)).map(([, a]) => a);
+      if (!names.length) return send(chatId, 'Nobody else is in the room.');
+      return send(chatId, '⚠️ Who is being rude, spamming, or asking for private details? If 2 people report the same person, they are removed.', kb(names.map((a) => [{ text: a, callback_data: `rm:rep:${code}:${a}` }])));
+    }
+    if (act === 'rep') {
+      const r = rooms.report(code, userId, arg);
+      if (!r.ok) return send(chatId, 'I could not report that person. They may have left already.');
+      await send(chatId, 'Thanks, I noted your report.');
+      if (r.removedId) {
+        await send(r.removedId, '🚫 You were removed from the room after reports from other people.');
+        const room = rooms.get(code);
+        if (room) { await tellRoom(room, F.roomNotice(`${arg} was removed from the room.`)); if (!room.members.size) await closeRoom(code, 'empty'); }
+      }
+    }
+  }
+
+  async function kakiMenu(chatId, userId) {
+    const on = rooms.isHelper(userId);
+    return send(chatId, F.KAKI_INTRO(on, rooms.helperCount()), kb([[on ? { text: '🛑 Stop being a Kaki', callback_data: 'kk:off' } : { text: '🙋 Join as a Kaki', callback_data: 'kk:on' }]]));
+  }
+  async function listRooms(chatId, userId) {
+    if (!rooms.isHelper(userId)) return send(chatId, 'Only Kakis can join rooms. Tap /kaki to become one.');
+    const open = rooms.openRooms().filter((r) => r.members.size < rooms.maxPeople && !r.members.has(String(userId)));
+    if (!open.length) return send(chatId, 'No rooms need help right now. I will ping you when one opens.');
+    for (const r of open.slice(0, 5)) await send(chatId, F.formatRoomPing(r), kb([[{ text: '🙋 Join', callback_data: `rm:join:${r.code}` }]]));
+  }
+
   // ---- screenshots ----
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   function imageOf(m) {
@@ -199,6 +366,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     if (await tooFast(chatId, userId, tapLimiter)) return;
     // Screenshots: a photo, or an image sent as a file. Read the text, show it, then carry on as if it was typed.
     const image = imageOf(m);
+    if (rooms.roomOf(userId) && (image || !(m.text || m.caption))) return send(chatId, 'Only text messages can be sent in a room. Please type what you want to say.');
     if (image) {
       if (await tooFast(chatId, userId)) return;
       const read = await readScreenshot(chatId, userId, image);
@@ -212,6 +380,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
 
   async function handleMessageText(m, chatId, userId, text, { fromImage = false } = {}) {
     const cmd = !fromImage && text.startsWith('/') ? text.split(/[\s@]/)[0].toLowerCase() : null;
+    if (!fromImage && rooms.roomOf(userId)) return roomMessage(m, chatId, userId, text, cmd);
     if (cmd) {
       switch (cmd) {
         case '/start': case '/help': return send(chatId, F.WELCOME);
@@ -227,6 +396,10 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
           return send(chatId, '🔒 Send or forward me the scam message, or a screenshot of it. I will hide names, phone numbers and other private details so you can warn your family safely.');
         }
         case '/cancel': states.delete(chatId); return send(chatId, 'Done. I have deleted what you sent me. Send a new message any time.');
+        case '/discuss': return roomDraft(chatId, userId);
+        case '/kaki': return kakiMenu(chatId, userId);
+        case '/rooms': return listRooms(chatId, userId);
+        case '/leave': case '/end': return send(chatId, 'You are not in a discussion room.');
         default: return send(chatId, 'I do not know that command. Send me a suspicious message, or tap /start.');
       }
     }
@@ -246,6 +419,12 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
       touch(chatId, { mode: null });
       return shareSafely(chatId, userId, text, null);
     }
+    if (s?.mode === 'await_message_for_room') {
+      if (!fromImage && await tooFast(chatId, userId)) return;
+      touch(chatId, { mode: null });
+      await analyseAndReply(chatId, userId, text, forwardName(m) || undefined);
+      return roomDraft(chatId, userId);
+    }
     if (s?.mode === 'await_message_for_report') {
       if (!fromImage && await tooFast(chatId, userId)) return;
       await analyseAndReply(chatId, userId, text, forwardName(m) || undefined);
@@ -264,6 +443,11 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     if (allowedUserIds.length && !allowedUserIds.includes(String(userId))) return;
     if (await tooFast(chatId, userId, tapLimiter)) return;
     const [kind, a, b] = String(q.data || '').split(':');
+    if (kind === 'rm') return roomCallback(q, chatId, userId);
+    if (kind === 'kk') {
+      rooms.setHelper(userId, a === 'on');
+      return send(chatId, a === 'on' ? '✅ You are now a Kaki. Thank you! I will ping you when someone needs a second opinion. Type /rooms to see rooms open now.' : 'OK, you are no longer a Kaki and I will not ping you. I removed your ID from the Kaki list.');
+    }
     const s = getState(chatId);
     if (kind === 'rp' && a === 'start') return nextReportStep(chatId);
     if (kind === 'urgent') return a === 'menu' ? urgentMenu(chatId) : urgentReply(chatId, a);
@@ -314,7 +498,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
       }
     }
   }
-  return { handleUpdate, run, _states: states };
+  return { handleUpdate, run, _states: states, _rooms: rooms, _checkRooms: checkRooms, stop: () => { clearInterval(roomTimer); clearInterval(sweep); } };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));

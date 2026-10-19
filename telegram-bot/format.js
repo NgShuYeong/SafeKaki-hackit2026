@@ -58,6 +58,8 @@ What I can do:
 • /report: prepare a scam report
 • /share: hide names and numbers so you can warn your family
 • /scammed: urgent help if you already shared a code or sent money
+• /discuss: open a short chat room where Kakis (other users) help you decide
+• /kaki: become a Kaki and get pinged when someone needs a second opinion
 • /tips: how to spot common scams
 • /privacy: what happens to your messages
 
@@ -70,7 +72,13 @@ export const PRIVACY = `🔒 <b>Your privacy</b>
 • Our logs record that a request happened, never what your message said.
 • Please do not send passwords, PINs or OTPs to me. If a message contains them, hide them first.
 • I never contact the police, banks or ScamShield for you. Reports are prepared for you to submit yourself.
-• Telegram itself can see your chat with me. Delete the chat if you want it gone.`;
+• Telegram itself can see your chat with me. Delete the chat if you want it gone.
+
+<b>Discussion rooms (/discuss)</b>
+• Before a message goes into a room, I hide names, phone numbers and other private details, and you see it first. Messages in the room are hidden the same way, and links are made unclickable.
+• People in a room only see made-up names like "Kaki 2", never your Telegram name or number.
+• The room chat is kept in memory only and deleted when the room closes. I keep the closing summary (the hidden-details version of the message, the votes and the key points), with no names attached.
+• If you join as a Kaki (/kaki), I save your Telegram user ID so I can ping you. Tap /kaki and "Stop" to be removed.`;
 
 export const TIPS = `🛡️ <b>Spot a scam</b>
 
@@ -107,5 +115,77 @@ export function formatShare(result, analysis) {
     '',
     `<pre>${esc(family)}</pre>`,
   ];
+  return lines.join('\n');
+}
+
+// ---- Kaki discussion rooms ----
+const RISK_SHORT = { high_risk: '🔴 High risk', suspicious: '🟠 Suspicious', insufficient_evidence: '🟡 Not enough evidence' };
+const ROOM_REASONS = {
+  empty: 'everyone has left',
+  idle: 'it was quiet for 20 minutes',
+  max: 'it reached the 1-hour limit',
+  ended: 'the asker closed it',
+};
+
+export const KAKI_INTRO = (on, count) => `🤝 <b>Kakis</b> are SafeKaki users who help others decide if a message is a scam.
+
+When someone opens a discussion room, I ping a few Kakis. Tap <b>Join</b> to chat with them. Everyone only sees made-up names like "Kaki 2". You can leave any time with /leave.
+
+${on ? '✅ <b>You are a Kaki.</b> I will ping you when someone needs help.' : 'You are not a Kaki yet.'}
+${count ? `There ${count === 1 ? 'is 1 Kaki' : `are ${count} Kakis`} right now.` : ''}`;
+
+export function formatRoomPreview(text, items) {
+  return [
+    '🗣 <b>Discuss with Kakis</b>',
+    'I will open a short chat room and ping other SafeKaki users (Kakis) who offered to help. They will only see a made-up name for you.',
+    '',
+    items.length ? `I hid: ${esc(describeHidden(items))}. Links are made unclickable.` : 'I did not find any private details to hide. Links are made unclickable.',
+    'This is what the Kakis will see:',
+    '',
+    `<pre>${esc(text)}</pre>`,
+    '',
+    'The room closes when everyone leaves, after 20 quiet minutes, or after 1 hour. Then I send everyone a summary and delete the chat.',
+  ].join('\n');
+}
+
+export function formatRoomPing(room) {
+  return [
+    '🔔 <b>A Kaki needs a second opinion!</b>',
+    `Someone got this message. SafeKaki says: <b>${RISK_SHORT[room.riskLevel] || ''}</b>`,
+    '',
+    `<pre>${esc(room.original)}</pre>`,
+    '',
+    `Tap <b>Join</b> to discuss it in room <b>#${esc(room.code)}</b>.`,
+  ].join('\n');
+}
+
+export function formatRoomWelcome(room, alias, count) {
+  return [
+    `🗣 <b>You are in room #${esc(room.code)}</b> as <b>${esc(alias)}</b>.`,
+    `SafeKaki says: <b>${RISK_SHORT[room.riskLevel] || ''}</b>${room.headline ? ` (${esc(room.headline)})` : ''}`,
+    '',
+    `<pre>${esc(room.original)}</pre>`,
+    '',
+    `${count} ${count === 1 ? 'person is' : 'people are'} here. Anything you type now goes to everyone in the room.`,
+    '• Be kind. Do not share your own private details.',
+    '• Do not open links from the message, even to "test" them.',
+    '• Tap 🗳 Vote when you have made up your mind, and /leave when you are done.',
+  ].join('\n');
+}
+
+export const roomLine = (alias, text) => `<b>${esc(alias)}:</b> ${esc(text)}`;
+export const roomNotice = (text) => `<i>${esc(text)}</i>`;
+
+export function formatRoomSummary(code, reason, s) {
+  const lines = [`📋 <b>Summary of room #${esc(code)}</b>`, `<i>The room has closed because ${ROOM_REASONS[reason] || 'it ended'}. The chat has been deleted.</i>`, ''];
+  lines.push(`<b>What the Kakis think</b>`, esc(s.verdict));
+  const { scam, unsure, real } = s.counts;
+  if (scam + unsure + real) lines.push(`🚩 Scam: ${scam}   🤔 Not sure: ${unsure}   ✅ Looks real: ${real}`);
+  lines.push('');
+  if (s.points.length) { lines.push('<b>Key points from the chat</b>'); s.points.forEach((p) => lines.push(`• ${esc(p)}`)); }
+  else lines.push(s.messageCount ? '<i>No specific warning signs were pointed out in the chat.</i>' : '<i>Nobody wrote anything in the room.</i>');
+  lines.push('', '<b>What to do</b>');
+  s.nextSteps.forEach((x) => lines.push(`• ${esc(x)}`));
+  lines.push('', '<i>Kakis are members of the public, not experts. When in doubt, call the ScamShield Helpline 1799 (free, 24/7).</i>');
   return lines.join('\n');
 }

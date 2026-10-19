@@ -9,3 +9,8 @@ telegram-bot/node_modules
 telegram-bot/serviceAccountKey.json
 telegram-bot/.env
 .env
+
+# Kaki rooms: helper IDs and saved room summaries
+data/kakis.json
+data/room-summaries.json
+data/*.tmp
