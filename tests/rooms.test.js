@@ -329,3 +329,20 @@ test('/demo Kaki demo: a pretend asker pings you, you join and chat, then you ge
     assert.ok(!t.tg.calls.some((c) => String(c.body.chat_id || '').startsWith('demo-')));
   } finally { t.bot.stop(); }
 });
+
+test('room messages bring the room buttons back each time, so they never stay hidden', async () => {
+  const t = setup();
+  try {
+    const code = await openRoomWithKakis(t);
+    await t.tap(6, `rm:join:${code}`);
+    const roomKeys = (body) => (body?.reply_markup?.keyboard || []).flat().map((k) => k.text);
+    for (const line of ['first', 'second', 'third']) {
+      await t.say(6, `Kaki says ${line}`);
+      assert.ok(roomKeys(t.tg.lastTo(5)).includes('🚪 Leave room'), `buttons on message ${line}`);
+    }
+    await t.say(5, 'Asker replies');
+    assert.ok(roomKeys(t.tg.lastTo(6)).includes('🗳 Vote'));
+    await t.tap(5, `rm:vote:${code}:scam`);
+    assert.ok(roomKeys(t.tg.lastTo(5)).includes('🚪 Leave room'));
+  } finally { t.bot.stop(); }
+});

@@ -184,8 +184,10 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
   }
   const voteRow = (code, prefix) => [[{ text: '🚩 Scam', callback_data: `${prefix}:${code}:scam` }, { text: '🤔 Not sure', callback_data: `${prefix}:${code}:unsure` }, { text: '✅ Looks real', callback_data: `${prefix}:${code}:real` }]];
   const cleanForRoom = (text) => defangLinks(redactLocal(text).text);
+  // Every message sent to people in a room carries the room buttons again: Telegram can hide the
+  // bottom buttons after someone types or taps, and this brings them back with each new message.
   async function tellRoom(room, html, exceptId) {
-    for (const id of room.members.keys()) if (id !== String(exceptId)) await send(id, html);
+    for (const id of room.members.keys()) if (id !== String(exceptId)) await send(id, html, roomMenu());
   }
 
   async function roomDraft(chatId, userId) {
@@ -310,7 +312,7 @@ Type /demo to turn it off.`, kb([[{ text: '📩 Use a sample scam message', call
     const k2 = `demo-${code}-2`;
     const sayAs = async (id, text) => {
       const said = rooms.say(id, cleanForRoom(text));
-      if (said) for (const to of said.to) await send(to, F.roomLine(said.alias, said.text));
+      if (said) for (const to of said.to) await send(to, F.roomLine(said.alias, said.text), roomMenu());
     };
     await wait(); if (!alive()) return;
     await sayAs(asker, 'Hi, thanks for joining! I got this on WhatsApp just now. The pay sounds very good leh. Is it real? Should I add him?');
@@ -357,7 +359,7 @@ Type /demo to turn it off.`, kb([[{ text: '📩 Use a sample scam message', call
       }
       const said = rooms.say(ids[k], cleanForRoom(text));
       if (!said) continue;
-      for (const id of said.to) await send(id, F.roomLine(said.alias, said.text));
+      for (const id of said.to) await send(id, F.roomLine(said.alias, said.text), roomMenu());
     }
     for (const k of joined) {
       await wait();
@@ -448,7 +450,7 @@ Type /demo to turn it off.`, kb([[{ text: '📩 Use a sample scam message', call
     const rl = roomChatLimiter.check(`c:${userId}`);
     if (!rl.allowed) return send(chatId, `You are typing a bit fast. Please wait ${rl.retryAfterSec} seconds.`);
     const said = rooms.say(userId, cleanForRoom(text));
-    for (const id of said.to) await send(id, F.roomLine(said.alias, said.text));
+    for (const id of said.to) await send(id, F.roomLine(said.alias, said.text), roomMenu());
     kakiDemos.get(room.code)?.waiting?.(); // a pretend asker is waiting for the real Kaki to reply
   }
 
@@ -459,13 +461,13 @@ Type /demo to turn it off.`, kb([[{ text: '📩 Use a sample scam message', call
     if (act === 'cancel') { touch(chatId, { roomDraft: null }); return send(chatId, 'OK, I did not open a room.'); }
     if (act === 'join') return joinRoom(chatId, userId, code);
     if (act === 'leave') return askBeforeLeaving(chatId, userId);
-    if (act === 'stay') return send(chatId, 'OK, you are still in the room.');
+    if (act === 'stay') return send(chatId, 'OK, you are still in the room.', roomMenu());
     if (act === 'vmenu') return voteMenu(chatId, code);
     if (act === 'vote' || act === 'bye') {
       if (arg !== 'skip') {
         const ok = rooms.vote(code, userId, arg);
         if (!ok && act === 'vote') return send(chatId, 'That room has closed.');
-        if (ok && act === 'vote') await send(chatId, `Thanks, your vote is in: ${{ scam: '🚩 Scam', unsure: '🤔 Not sure', real: '✅ Looks real' }[arg]}.`);
+        if (ok && act === 'vote') await send(chatId, `Thanks, your vote is in: ${{ scam: '🚩 Scam', unsure: '🤔 Not sure', real: '✅ Looks real' }[arg]}. Tap 🚪 Leave room when you are done.`, rooms.roomOf(userId) ? roomMenu() : {});
       }
       if (act === 'bye' && rooms.roomOf(userId)?.code === code) return leaveRoom(chatId, userId);
       return;
@@ -474,7 +476,7 @@ Type /demo to turn it off.`, kb([[{ text: '📩 Use a sample scam message', call
     if (act === 'rep') {
       const r = rooms.report(code, userId, arg);
       if (!r.ok) return send(chatId, 'I could not report that person. They may have left already.');
-      await send(chatId, 'Thanks, I noted your report.');
+      await send(chatId, 'Thanks, I noted your report.', roomMenu());
       if (r.removedId) {
         await send(r.removedId, '🚫 You were removed from the room after reports from other people.', mainMenu());
         const room = rooms.get(code);
