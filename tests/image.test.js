@@ -117,3 +117,11 @@ test('bot: stickers and voice notes get a clear "text or screenshot" reply', asy
   await bot.handleUpdate({ update_id: 1, message: { message_id: 1, chat: { id: 9, type: 'private' }, from: { id: 9, is_bot: false }, voice: { file_id: 'v' } } });
   assert.match(tg.sent().at(-1).text, /screenshot/);
 });
+
+test('bot: voice notes get a voice-specific reply that mentions 1799', async () => {
+  const tg = mockTelegram();
+  const bot = createBot({ token: 'T', fetchImpl: tg.fetchImpl, apiBase: 'http://tg.local', backend, log: () => {} });
+  await bot.handleUpdate({ update_id: 1, message: { message_id: 1, chat: { id: 9, type: 'private' }, from: { id: 9, is_bot: false }, voice: { file_id: 'v' } } });
+  assert.match(tg.sent().at(-1).text, /voice notes/);
+  assert.match(tg.sent().at(-1).text, /1799/);
+});

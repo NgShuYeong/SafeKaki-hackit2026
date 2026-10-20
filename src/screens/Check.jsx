@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { analyzeMessage } from '../api.js';
-import { Callout, ErrorBox, Icon, MarkedMessage, MicButton, PageTitle, ScreenshotButton, Spinner, levelStyle, onPasteImage } from '../components/ui.jsx';
+import { Callout, ErrorBox, Icon, KakisCard, MarkedMessage, MicButton, PageTitle, ReadAloudButton, ScreenshotButton, Spinner, levelStyle, onPasteImage } from '../components/ui.jsx';
 
 const EXAMPLES = [
   'Eh bro, your bank account kena locked already. Click here to verify: dbs-sg-secure.top/login',
@@ -93,6 +93,7 @@ export default function Check({ session, setSession }) {
               <p className="mt-2">{a.summary}</p>
               {a.scamCategory !== 'unclear' && a.riskLevel !== 'insufficient_evidence' && <p className="mt-2 text-slate-700">Looks like: <strong>{a.scamCategoryLabel}</strong></p>}
               {a.riskLevel === 'insufficient_evidence' && <p className="mt-3 font-bold">This is not a safety check. If you are unsure, do not click or reply, and call 1799.</p>}
+              <div className="mt-4"><ReadAloudButton text={[st.label, a.headline, a.summary, a.urgent ? `${a.urgent.title}. ${a.urgent.actions.join('. ')}` : '', `What to do now. ${a.nextSteps.join('. ')}`].filter(Boolean).join('. ')} /></div>
             </div>
           </div>
 
@@ -135,6 +136,8 @@ export default function Check({ session, setSession }) {
             <h3 className="text-lg font-bold mb-2">What to do now</h3>
             <ol className="list-decimal pl-6 grid gap-2">{a.nextSteps.map((s) => <li key={s}>{s}</li>)}</ol>
           </div>
+
+          <KakisCard />
 
           <div className="grid gap-3 sm:grid-cols-2">
             {a.riskLevel !== 'insufficient_evidence' && <a href="#/report" className="btn-primary"><Icon name="flag" /> Prepare a report</a>}

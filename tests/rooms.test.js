@@ -28,7 +28,7 @@ const tmpDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'safekaki-rooms-'));
 function setup(roomOptions = {}) {
   const tg = mockTelegram();
   const dataDir = tmpDir();
-  const bot = createBot({ token: 'TEST', fetchImpl: tg.fetchImpl, apiBase: 'http://tg.local', backend, log: () => {}, dataDir, roomOptions });
+  const bot = createBot({ token: 'TEST', fetchImpl: tg.fetchImpl, apiBase: 'http://tg.local', backend, log: () => {}, dataDir, roomOptions, demoKakis: false, demoDelayMs: 0 });
   let n = 1;
   const say = (from, text) => bot.handleUpdate({ update_id: n++, message: { message_id: n, chat: { id: from, type: 'private' }, from: { id: from, is_bot: false }, text } });
   const tap = (from, data) => bot.handleUpdate({ update_id: n++, callback_query: { id: 'q', from: { id: from }, data, message: { message_id: 9, chat: { id: from, type: 'private' } } } });
@@ -209,4 +209,69 @@ test('Kaki list is saved to disk and can be left', async () => {
   assert.ok(createRooms({ dataDir: dir }).isHelper(42));
   a.setHelper(42, false);
   assert.ok(!createRooms({ dataDir: dir }).isHelper(42));
+});
+
+test('demo mode: two pretend Kakis join, chat, vote and leave, then the asker gets a summary', async () => {
+  const tg = mockTelegram();
+  const dataDir = tmpDir();
+  const bot = createBot({ token: 'TEST', fetchImpl: tg.fetchImpl, apiBase: 'http://tg.local', backend, log: () => {}, dataDir, demoKakis: true, demoDelayMs: 0 });
+  let n = 1;
+  const say = (from, text) => bot.handleUpdate({ update_id: n++, message: { message_id: n, chat: { id: from, type: 'private' }, from: { id: from, is_bot: false }, text } });
+  const tap = (from, data) => bot.handleUpdate({ update_id: n++, callback_query: { id: 'q', from: { id: from }, data, message: { message_id: 9, chat: { id: from, type: 'private' } } } });
+  try {
+    await say(5, SCAM); // no real Kakis exist, demo mode still opens the room
+    await tap(5, 'rm:open');
+    await tap(5, 'rm:post');
+    const code = bot._rooms.roomOf(5).code;
+    assert.match(tg.to(5).map((b) => b.text).join('\n'), /Demo mode/);
+    await bot._demoDone();
+    const seen = tg.to(5).map((b) => b.text).join('\n');
+    assert.match(seen, /Kaki 1 \(demo\) joined/);
+    assert.match(seen, /Kaki 2 \(demo\):<\/b> Agree/);
+    assert.match(seen, /voted 🚩 Scam and left/);
+    // Nothing is ever sent to a pretend Kaki.
+    assert.ok(!tg.calls.some((c) => String(c.body.chat_id || '').startsWith('demo-')));
+    // The asker votes and leaves: the room is empty, so it closes with a summary.
+    await tap(5, 'rm:leave');
+    await tap(5, `rm:bye:${code}:scam`);
+    const summary = tg.to(5).map((b) => b.text).find((t) => t.includes('Summary of room'));
+    assert.ok(summary, 'summary sent');
+    assert.match(summary, /3 of 3 Kakis think it is a scam/);
+    const saved = JSON.parse(fs.readFileSync(path.join(dataDir, 'room-summaries.json'), 'utf8'));
+    assert.equal(saved.at(-1).demo, true);
+  } finally { bot.stop(); }
+});
+
+test('without demo mode, no Kakis means no room', async () => {
+  const t = setup();
+  try {
+    await t.say(5, SCAM);
+    await t.tap(5, 'rm:open');
+    await t.tap(5, 'rm:post');
+    assert.match(t.tg.lastTo(5).text, /no Kakis are free/);
+    assert.equal(t.bot._rooms.roomOf(5), null);
+  } finally { t.bot.stop(); }
+});
+
+test('/demo turns demo Kakis on for that person only, and /demo again turns it off', async () => {
+  const t = setup({});
+  try {
+    await t.say(5, '/demo');
+    assert.match(t.tg.lastTo(5).text, /Demo mode is on/);
+    await t.tap(5, 'demo:sample'); // sample scam message is checked
+    assert.ok(t.tg.to(5).some((b) => /High risk/i.test(b.text)));
+    await t.tap(5, 'rm:open');
+    await t.tap(5, 'rm:post'); // no real Kakis, but the room still opens
+    assert.ok(t.bot._rooms.roomOf(5));
+    await t.bot._demoDone();
+    assert.match(t.tg.to(5).map((b) => b.text).join('\n'), /Kaki 1 \(demo\) joined/);
+    await t.say(5, '/end');
+    // Someone else without /demo still gets the normal "no Kakis" answer.
+    await t.say(8, SCAM);
+    await t.tap(8, 'rm:open');
+    await t.tap(8, 'rm:post');
+    assert.match(t.tg.lastTo(8).text, /no Kakis are free/);
+    await t.say(5, '/demo');
+    assert.match(t.tg.lastTo(5).text, /Demo mode is <b>off<\/b>/);
+  } finally { t.bot.stop(); }
 });

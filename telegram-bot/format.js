@@ -49,21 +49,58 @@ export function channelText(channels) {
   return lines.join('\n');
 }
 
-export const WELCOME = `👋 Hello! I'm <b>SafeKaki</b>, your scam-check buddy.
+// Big buttons that stay at the bottom of the chat, so nobody has to type a /command.
+export const BUTTONS = {
+  check: '🔍 Check a message',
+  kakis: '🗣 Ask Kakis',
+  scammed: '🚨 I got scammed',
+  share: '🔒 Warn family',
+  help: '❓ Help',
+  website: '🌐 Website',
+};
+export function mainKeyboard(websiteUrl) {
+  return {
+    keyboard: [
+      [{ text: BUTTONS.check }, { text: BUTTONS.kakis }],
+      [{ text: BUTTONS.scammed }, { text: BUTTONS.share }],
+      websiteUrl ? [{ text: BUTTONS.help }, { text: BUTTONS.website }] : [{ text: BUTTONS.help }],
+    ],
+    resize_keyboard: true,
+    is_persistent: true,
+    input_field_placeholder: 'Paste or forward the message here',
+  };
+}
 
-Send me a suspicious message and I'll tell you if it has warning signs. You can paste it, forward it, or send a 📷 screenshot of it. English, Singlish and mixed languages are fine.
+const websiteLine = (url) => (url ? `\n\n🌐 Prefer a bigger screen? SafeKaki is also a website: ${esc(url)}` : '');
 
-What I can do:
-• Check a message: just send it (text or screenshot)
-• /report: prepare a scam report
-• /share: hide names and numbers so you can warn your family
-• /scammed: urgent help if you already shared a code or sent money
-• /discuss: open a short chat room where Kakis (other users) help you decide
-• /kaki: become a Kaki and get pinged when someone needs a second opinion
+export const WELCOME = (websiteUrl) => `👋 Hello! I'm <b>SafeKaki</b>, your scam-check buddy.
+
+<b>How to use me</b>
+1️⃣ Got a message that feels wrong? Forward it to me, paste it, or send a 📷 screenshot. English, Singlish and mixed languages are fine.
+2️⃣ I tell you the warning signs and what to do next.
+3️⃣ Still not sure? Tap <b>${BUTTONS.kakis}</b> and other SafeKaki users will help you decide.
+
+Use the big buttons at the bottom of the screen. Already sent money or shared a code? Tap <b>${BUTTONS.scammed}</b>.
+
+When in doubt, call the ScamShield Helpline <b>1799</b> (free, 24/7).${websiteLine(websiteUrl)}`;
+
+export const HELP = (websiteUrl) => `❓ <b>What I can do</b>
+
+• <b>Check a message:</b> just send it (text, forwarded message or screenshot)
+• <b>${BUTTONS.kakis}</b> (/discuss): open a short chat room where Kakis (other users) help you decide
+• <b>${BUTTONS.scammed}</b> (/scammed): urgent steps if you already shared a code or sent money
+• <b>${BUTTONS.share}</b> (/share): hide names and numbers so you can warn your family
+• /report: prepare a scam report for you to submit
+• /kaki: become a Kaki and help others spot scams
 • /tips: how to spot common scams
 • /privacy: what happens to your messages
+• /cancel: delete what you sent me
 
-I cannot be 100% sure about any message. When in doubt, call the ScamShield Helpline <b>1799</b> (free, 24/7).`;
+I cannot be 100% sure about any message. When in doubt, call the ScamShield Helpline <b>1799</b> (free, 24/7).${websiteLine(websiteUrl)}`;
+
+export const WEBSITE = (url) => (url
+  ? `🌐 <b>SafeKaki website</b>\n\nOpen this link for bigger text, voice input and a read-aloud button:\n${esc(url)}`
+  : 'The website link has not been set up for this bot yet.');
 
 export const PRIVACY = `🔒 <b>Your privacy</b>
 
@@ -93,6 +130,7 @@ export const TIPS = `🛡️ <b>Spot a scam</b>
 Report scam messages through the <b>ScamShield</b> app (${esc(RESOURCES.scamshield.url)}) and call <b>1799</b> if you are unsure.`;
 
 export const NEED_MESSAGE = 'Please paste or forward the suspicious message to me, or send a screenshot of it.';
+export const VOICE_NOTE = '🎤 Sorry, I cannot listen to voice notes yet. Please forward the suspicious message itself, paste the words, or send a screenshot of it.\n\nIf someone called you and you are worried, hang up and call the ScamShield Helpline <b>1799</b>.';
 export const TEXT_ONLY = 'I can read text and screenshots (PNG or JPG). Voice notes, videos and stickers are not supported yet. Please paste the words, or send a screenshot of the message.';
 export const READING_IMAGE = '📷 Reading your screenshot…';
 export const formatReadText = (text, method) => `📷 <b>Here is what I read from your screenshot</b>${method === 'ocr' ? ' (if something looks wrong, paste the text instead)' : ''}:\n\n<pre>${esc(text)}</pre>`;

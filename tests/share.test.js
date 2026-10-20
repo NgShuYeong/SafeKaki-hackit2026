@@ -88,3 +88,18 @@ test('bot: /share with nothing held asks for a message, then hides it without an
   assert.ok(!t.includes('123-45678-9'));
   assert.equal(analysed, 0);
 });
+
+test('names with "Ah" are hidden in full without an AI key', () => {
+  for (const [input, gone] of [
+    ['Send the OTP to Mr Tan Ah Kow at once.', 'Ah Kow'],
+    ['Hi Ah Huat, your parcel is held.', 'Huat'],
+    ['Uncle Ah Seng please call me', 'Seng'],
+  ]) {
+    const r = redactLocal(input);
+    assert.ok(!r.text.includes(gone), `${input} -> ${r.text}`);
+    assert.ok(r.text.includes('[NAME 1]'));
+  }
+  // Words that are not names are still trimmed from the edges.
+  assert.equal(redactLocal('Dear Customer Tan, your account').text, 'Dear Customer [NAME 1], your account');
+  assert.equal(redactLocal('Hi Customer, your parcel is waiting.').items.length, 0);
+});

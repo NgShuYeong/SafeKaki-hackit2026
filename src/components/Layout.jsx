@@ -1,5 +1,5 @@
 import React from 'react';
-import { Icon } from './ui.jsx';
+import { Icon, TextSizeButton } from './ui.jsx';
 
 const NAV = [
   { to: '/check', label: 'Check', icon: 'search' },
@@ -14,7 +14,7 @@ export default function Layout({ route, children }) {
     <div className="min-h-screen flex flex-col">
       <a href="#main" onClick={(e) => { e.preventDefault(); document.getElementById('main')?.focus(); }} className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-white focus:p-4 focus:m-2 focus:rounded-lg">Skip to main content</a>
       <header className="bg-brand text-white">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <a href="#/" className="flex items-center gap-3 font-bold text-lg min-h-tap" aria-label="SafeKaki home">
             <Icon name="shield" className="w-9 h-9" /> SafeKaki
           </a>
@@ -24,9 +24,12 @@ export default function Layout({ route, children }) {
                 className={`px-4 py-3 rounded-lg font-bold min-h-[48px] flex items-center ${route === n.to ? 'bg-white text-brand' : 'hover:bg-white/15'}`}>{n.label}</a>
             ))}
           </nav>
-          <a href="tel:1799" className="md:hidden btn bg-white text-brand !min-h-[48px] !px-4 !py-2">
-            <Icon name="phone" className="w-5 h-5" /> 1799
-          </a>
+          <div className="flex items-center gap-2 ml-auto">
+            <TextSizeButton />
+            <a href="tel:1799" className="md:hidden btn bg-white text-brand !min-h-[48px] !px-4 !py-2">
+              <Icon name="phone" className="w-5 h-5" /> 1799
+            </a>
+          </div>
         </div>
       </header>
       <main id="main" tabIndex={-1} className="flex-1 w-full max-w-3xl mx-auto px-4 py-6 md:py-10 pb-28 md:pb-10 outline-none">{children}</main>

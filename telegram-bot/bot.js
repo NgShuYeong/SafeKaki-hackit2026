@@ -26,9 +26,15 @@ const COMMANDS = [
   { command: 'tips', description: 'How to spot scams' },
   { command: 'privacy', description: 'What happens to my messages' },
   { command: 'cancel', description: 'Delete what you sent me and start over' },
+  { command: 'help', description: 'Everything I can do' },
 ];
+// Text sent by the big bottom buttons, and the command each one stands for.
+const BUTTON_COMMANDS = {
+  [F.BUTTONS.check]: '/check', [F.BUTTONS.kakis]: '/discuss', [F.BUTTONS.scammed]: '/scammed',
+  [F.BUTTONS.share]: '/share', [F.BUTTONS.help]: '/help', [F.BUTTONS.website]: '/website',
+};
 
-export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, apiBase = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org', allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean), ratePerMin = Number(process.env.BOT_RATE_LIMIT_PER_MIN) || 8, log = console.log, dataDir = DEFAULT_DATA_DIR, roomOptions = {} } = {}) {
+export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, apiBase = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org', allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean), ratePerMin = Number(process.env.BOT_RATE_LIMIT_PER_MIN) || 8, log = console.log, dataDir = DEFAULT_DATA_DIR, roomOptions = {}, demoKakis = process.env.DEMO_KAKIS === '1', demoDelayMs = Number(process.env.DEMO_KAKIS_DELAY_MS) || 3500, websiteUrl = (process.env.SAFEKAKI_WEBSITE_URL || '').trim() } = {}) {
   if (!token) throw new Error('TELEGRAM_BOT_TOKEN is missing');
   // Two limits: "checks" are actions that analyse a message (and may cost AI money);
   // "taps" are cheap button presses and plain chat, with a much higher limit just to stop spam.
@@ -52,7 +58,10 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     if (!data.ok) { const e = new Error(`telegram_${data.error_code || res.status}`); e.retryAfter = data.parameters?.retry_after; e.code = data.error_code; throw e; }
     return data.result;
   }
+  // Pretend Kakis in demo mode have IDs like "demo-ABCD-1". They have no Telegram chat, so nothing is sent to them.
+  const isDemoId = (id) => String(id).startsWith('demo-');
   async function send(chatId, text, extra = {}) {
+    if (isDemoId(chatId)) return;
     const chunks = [];
     let rest = text;
     while (rest.length > 3900) { let cut = rest.lastIndexOf('\n', 3900); if (cut < 1000) cut = 3900; chunks.push(rest.slice(0, cut)); rest = rest.slice(cut); }
@@ -186,15 +195,93 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     const s = getState(chatId);
     if (!s?.roomDraft) return send(chatId, 'That has expired. Please send the message again, then tap 🗣 Discuss with Kakis.');
     if (rooms.roomOf(userId)) return send(chatId, 'You are already in a discussion room. Type /leave first.');
+    const demo = demoKakis || demoUsers.has(String(userId));
     const helpers = rooms.pickHelpers(userId);
-    if (!helpers.length) return send(chatId, 'Sorry, no Kakis are free right now. Please try again later, or call the ScamShield Helpline 1799 to check the message with them.');
+    if (!helpers.length && !demo) return send(chatId, 'Sorry, no Kakis are free right now. Please try again later, or call the ScamShield Helpline 1799 to check the message with them.');
     const rl = roomOpenLimiter.check(`r:${userId}`);
     if (!rl.allowed) return send(chatId, 'You have opened a few rooms already. Please wait a while before opening another one.');
     const a = s.analysis || {};
     const room = rooms.create({ ownerId: userId, original: s.roomDraft, riskLevel: a.riskLevel || 'insufficient_evidence', category: a.scamCategory, headline: a.headline });
     touch(chatId, { roomDraft: null });
-    await send(chatId, F.formatRoomWelcome(room, 'Asker', 1) + `\n\n🔔 I pinged ${helpers.length} ${helpers.length === 1 ? 'Kaki' : 'Kakis'}. I will tell you when someone joins.`, roomMenu(room.code));
+    const pinged = helpers.length ? `🔔 I pinged ${helpers.length} ${helpers.length === 1 ? 'Kaki' : 'Kakis'}. I will tell you when someone joins.` : '';
+    const demoNote = demo ? '🧪 <b>Demo mode:</b> 2 pretend Kakis will join in a few seconds to show how a room works.' : '';
+    await send(chatId, F.formatRoomWelcome(room, 'Asker', 1) + '\n\n' + [pinged, demoNote].filter(Boolean).join('\n'), roomMenu(room.code));
     for (const id of helpers) await send(id, F.formatRoomPing(room), kb([[{ text: '🙋 Join', callback_data: `rm:join:${room.code}` }]]));
+    if (demo) lastDemo = runDemo(room.code).catch((e) => log(`demo failed: ${e.message}`));
+  }
+
+  // ---- Demo mode (DEMO_KAKIS=1): two pretend Kakis join, chat, vote and leave ----
+  // For showing rooms with one phone. Off unless switched on in .env. Pretend Kakis are labelled "(demo)".
+  const DEMO_SCRIPTS = {
+    high_risk: { votes: ['scam', 'scam'], lines: [
+      [1, 'Wah, this one looks dodgy. Banks will never ask you to click a link to unlock your account.'],
+      [2, 'Agree. The link is not the real bank website, and they are rushing you. Do not click and do not reply.'],
+      [1, 'If you are worried, call the bank using the number on the back of your card, not the number in the message.'],
+    ] },
+    suspicious: { votes: ['scam', 'unsure'], lines: [
+      [1, 'Hmm, something feels off. They want you to act fast, which is a common scam trick.'],
+      [2, 'Do not click the link first. Check in the official app, or call 1799 to ask.'],
+      [1, 'Never share your OTP or password with anyone, even if they say they are from the bank.'],
+    ] },
+    insufficient_evidence: { votes: ['unsure', 'unsure'], lines: [
+      [1, 'Hard to tell from this alone. Do you know who sent it?'],
+      [2, 'If it says it is from someone you know, call them on their old number to check. Do not send money or codes first.'],
+      [1, 'When unsure, you can call the ScamShield Helpline 1799.'],
+    ] },
+  };
+  const demoRooms = new Set();
+  // /demo turns demo Kakis on for one person's own rooms. Kept in memory, so a restart turns it off.
+  const demoUsers = new Set();
+  const DEMO_SAMPLE = 'DBS Alert: Your account has been blocked due to suspicious activity. Click https://dbs-sg-verify.top/login within 24 hours and enter the OTP we send you to unlock it, or your account will be closed.';
+  async function demoCommand(chatId, userId) {
+    const id = String(userId);
+    if (demoUsers.has(id)) { demoUsers.delete(id); return send(chatId, '🧪 Demo mode is <b>off</b>. Your rooms will only have real Kakis again.'); }
+    demoUsers.add(id);
+    return send(chatId, `🧪 <b>Demo mode is on</b> (only for you).
+
+When you open a room, 2 pretend Kakis will join, chat, vote and leave, so you can show how a room works with one phone. Real Kakis are still pinged too.
+
+How to run it:
+1. Send or forward a scam message, or tap the button below to use a sample.
+2. Tap <b>🗣 Discuss with Kakis</b>, then <b>✅ Open the room</b>.
+3. Watch the Kakis join. Then vote and /leave to get the summary.
+
+Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message', callback_data: 'demo:sample' }]]));
+  }
+  let lastDemo = Promise.resolve();
+  async function runDemo(code) {
+    demoRooms.add(code);
+    const alive = () => { const r = rooms.get(code); return r && !r.closed ? r : null; };
+    const script = DEMO_SCRIPTS[alive()?.riskLevel] || DEMO_SCRIPTS.insufficient_evidence;
+    const wait = () => new Promise((r) => setTimeout(r, demoDelayMs));
+    const ids = { 1: `demo-${code}-1`, 2: `demo-${code}-2` };
+    const joined = [];
+    for (const [k, text] of script.lines) {
+      await wait();
+      if (!alive()) return;
+      if (!joined.includes(k)) {
+        const r = rooms.join(code, ids[k], { demo: true });
+        if (!r.ok) continue;
+        joined.push(k);
+        await tellRoom(r.room, F.roomNotice(`${r.alias} joined. ${r.room.members.size} people are here.`), ids[k]);
+        await wait();
+        if (!alive()) return;
+      }
+      const said = rooms.say(ids[k], cleanForRoom(text));
+      if (!said) continue;
+      for (const id of said.to) await send(id, F.roomLine(said.alias, said.text));
+    }
+    for (const k of joined) {
+      await wait();
+      if (!alive()) return;
+      const choice = script.votes[k - 1];
+      rooms.vote(code, ids[k], choice);
+      const left = rooms.leave(ids[k]);
+      if (!left) continue;
+      if (left.empty) return closeRoom(code, 'empty');
+      const n = left.room.members.size;
+      await tellRoom(left.room, F.roomNotice(`${left.alias} voted ${{ scam: '🚩 Scam', unsure: '🤔 Not sure', real: '✅ Looks real' }[choice]} and left. ${n} ${n === 1 ? 'person is' : 'people are'} still here.`));
+    }
   }
 
   async function joinRoom(chatId, userId, code) {
@@ -237,7 +324,8 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     snap.transcript = []; // the chat log is not kept
     const text = F.formatRoomSummary(code, reason, summary);
     for (const id of snap.recipients) await send(id, text);
-    rooms.saveSummary({ code, closedAt: new Date().toISOString(), reason, message: snap.original, riskLevel: snap.riskLevel, category: snap.category || null, votes: summary.counts, points: summary.points, method: summary.method, messages: summary.messageCount, people: snap.peopleCount });
+    const demo = demoRooms.delete(code);
+    rooms.saveSummary({ code, closedAt: new Date().toISOString(), ...(demo ? { demo: true } : {}), reason, message: snap.original, riskLevel: snap.riskLevel, category: snap.category || null, votes: summary.counts, points: summary.points, method: summary.method, messages: summary.messageCount, people: snap.peopleCount });
   }
 
   async function checkRooms() {
@@ -259,6 +347,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
         return closeRoom(room.code, 'ended');
       }
       if (cmd === '/privacy') return send(chatId, F.PRIVACY);
+      if (cmd === '/scammed') return urgentMenu(chatId); // urgent help is never blocked by a room
       return send(chatId, `You are in room #${room.code}. Anything you type goes to the room. To do something else, type /leave first.`, roomMenu(room.code));
     }
     const rl = roomChatLimiter.check(`c:${userId}`);
@@ -374,16 +463,19 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
       return handleMessageText(m, chatId, userId, read, { fromImage: true });
     }
     const text = m.text || m.caption;
-    if (!text) return send(chatId, F.TEXT_ONLY);
+    if (!text) return send(chatId, m.voice || m.audio || m.video_note ? F.VOICE_NOTE : F.TEXT_ONLY);
     return handleMessageText(m, chatId, userId, text);
   }
 
   async function handleMessageText(m, chatId, userId, text, { fromImage = false } = {}) {
-    const cmd = !fromImage && text.startsWith('/') ? text.split(/[\s@]/)[0].toLowerCase() : null;
+    const button = !fromImage && BUTTON_COMMANDS[text.trim()];
+    const cmd = button || (!fromImage && text.startsWith('/') ? text.split(/[\s@]/)[0].toLowerCase() : null);
     if (!fromImage && rooms.roomOf(userId)) return roomMessage(m, chatId, userId, text, cmd);
     if (cmd) {
       switch (cmd) {
-        case '/start': case '/help': return send(chatId, F.WELCOME);
+        case '/start': return send(chatId, F.WELCOME(websiteUrl), { reply_markup: F.mainKeyboard(websiteUrl) });
+        case '/help': return send(chatId, F.HELP(websiteUrl), { reply_markup: F.mainKeyboard(websiteUrl) });
+        case '/website': return send(chatId, F.WEBSITE(websiteUrl));
         case '/tips': return send(chatId, F.TIPS);
         case '/privacy': return send(chatId, F.PRIVACY);
         case '/scammed': return urgentMenu(chatId);
@@ -398,6 +490,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
         case '/cancel': states.delete(chatId); return send(chatId, 'Done. I have deleted what you sent me. Send a new message any time.');
         case '/discuss': return roomDraft(chatId, userId);
         case '/kaki': return kakiMenu(chatId, userId);
+        case '/demo': return demoCommand(chatId, userId); // not in the command menu on purpose
         case '/rooms': return listRooms(chatId, userId);
         case '/leave': case '/end': return send(chatId, 'You are not in a discussion room.');
         default: return send(chatId, 'I do not know that command. Send me a suspicious message, or tap /start.');
@@ -444,6 +537,11 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     if (await tooFast(chatId, userId, tapLimiter)) return;
     const [kind, a, b] = String(q.data || '').split(':');
     if (kind === 'rm') return roomCallback(q, chatId, userId);
+    if (kind === 'demo' && a === 'sample') {
+      if (rooms.roomOf(userId)) return send(chatId, 'You are in a room. Type /leave first.');
+      await send(chatId, `📩 Sample message:\n<pre>${F.esc(DEMO_SAMPLE)}</pre>`);
+      return analyseAndReply(chatId, userId, DEMO_SAMPLE);
+    }
     if (kind === 'kk') {
       rooms.setHelper(userId, a === 'on');
       return send(chatId, a === 'on' ? '✅ You are now a Kaki. Thank you! I will ping you when someone needs a second opinion. Type /rooms to see rooms open now.' : 'OK, you are no longer a Kaki and I will not ping you. I removed your ID from the Kaki list.');
@@ -480,7 +578,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
 
   async function run({ signal } = {}) {
     await tg('deleteWebhook', {}).catch((e) => log(`deleteWebhook: ${e.message}`));
-    await tg('setMyCommands', { commands: COMMANDS }).catch((e) => log(`setMyCommands: ${e.message}`));
+    await tg('setMyCommands', { commands: websiteUrl ? [...COMMANDS, { command: 'website', description: 'Open the SafeKaki website' }] : COMMANDS }).catch((e) => log(`setMyCommands: ${e.message}`));
     log(`SafeKaki bot running (backend: ${backend.mode}). Press Ctrl+C to stop.`);
     let offset = 0, backoff = 1000;
     while (!signal?.aborted) {
@@ -498,7 +596,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
       }
     }
   }
-  return { handleUpdate, run, _states: states, _rooms: rooms, _checkRooms: checkRooms, stop: () => { clearInterval(roomTimer); clearInterval(sweep); } };
+  return { handleUpdate, run, _states: states, _rooms: rooms, _checkRooms: checkRooms, _demoDone: () => lastDemo, stop: () => { clearInterval(roomTimer); clearInterval(sweep); } };
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));

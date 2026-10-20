@@ -21,6 +21,9 @@ const PATHS = {
   stop: 'M6 6h12v12H6z',
   image: 'M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2ZM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5ZM8 9.5A1.5 1.5 0 1 1 8 6.5a1.5 1.5 0 0 1 0 3Z',
   edit: 'M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3ZM20.7 7c.4-.4.4-1 0-1.4l-2.3-2.3a1 1 0 0 0-1.4 0l-1.8 1.8 3.7 3.7L20.7 7Z',
+  speaker: 'M3 9v6h4l5 5V4L7 9H3Zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4ZM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6Z',
+  users: 'M16 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-8 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 2c-2.3 0-7 1.2-7 3.5V19h14v-2.5C15 14.2 10.3 13 8 13Zm8 0c-.3 0-.6 0-1 .1 1.2.8 2 2 2 3.4V19h6v-2.5c0-2.3-4.7-3.5-7-3.5Z',
+  textsize: 'M9 4v3h5v12h3V7h5V4H9Zm-6 8h3v7h3v-7h3V9H3v3Z',
 };
 
 export function Icon({ name, className = 'w-6 h-6', label }) {
@@ -211,4 +214,68 @@ export function onPasteImage({ onText, onError, onBusy }) {
     catch (err) { onError?.(err.message); }
     finally { onBusy?.(false); }
   };
+}
+
+// ---- Read aloud (uses the browser's own voice, nothing is sent anywhere) ----
+export function ReadAloudButton({ text, label = 'Read this out loud' }) {
+  const synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
+  const [speaking, setSpeaking] = useState(false);
+  useEffect(() => () => synth?.cancel(), [synth]);
+  if (!synth || typeof window.SpeechSynthesisUtterance === 'undefined') return null;
+  const toggle = () => {
+    if (speaking) { synth.cancel(); setSpeaking(false); return; }
+    synth.cancel();
+    const u = new window.SpeechSynthesisUtterance(text);
+    u.lang = 'en-SG';
+    u.rate = 0.9; // a little slower is easier to follow
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    synth.speak(u);
+    setSpeaking(true);
+  };
+  return (
+    <button type="button" className="btn-secondary" onClick={toggle} aria-pressed={speaking}>
+      <Icon name={speaking ? 'stop' : 'speaker'} /> {speaking ? 'Stop reading' : label}
+    </button>
+  );
+}
+
+// ---- Text size (remembered on this device only) ----
+const TEXT_SIZES = [
+  { pct: '100%', name: 'Normal' },
+  { pct: '115%', name: 'Large' },
+  { pct: '130%', name: 'Extra large' },
+];
+function savedTextSize() {
+  try { const i = Number(window.localStorage.getItem('safekaki-text-size')); return i >= 0 && i < TEXT_SIZES.length ? i : 0; } catch { return 0; }
+}
+export function TextSizeButton({ className = '' }) {
+  const [i, setI] = useState(savedTextSize);
+  useEffect(() => {
+    document.documentElement.style.fontSize = TEXT_SIZES[i].pct; // every size on the page is in rem, so all of it grows
+    try { window.localStorage.setItem('safekaki-text-size', String(i)); } catch { /* not remembered, still works */ }
+  }, [i]);
+  const next = TEXT_SIZES[(i + 1) % TEXT_SIZES.length].name;
+  return (
+    <button type="button" onClick={() => setI((i + 1) % TEXT_SIZES.length)} className={`btn bg-white/15 hover:bg-white/25 text-white !min-h-[48px] !px-3 !py-2 ${className}`}
+      aria-label={`Text size: ${TEXT_SIZES[i].name}. Tap for ${next}.`} title={`Text size: ${TEXT_SIZES[i].name}`}>
+      <Icon name="textsize" className="w-6 h-6" /><span aria-hidden="true" className="hidden sm:inline">{['A', 'A+', 'A++'][i]}</span>
+    </button>
+  );
+}
+
+// ---- Kakis (the community discussion rooms live on Telegram) ----
+export const TELEGRAM_BOT_URL = import.meta.env.VITE_TELEGRAM_BOT_URL;
+export function KakisCard({ title = 'Still not sure? Ask other people', hint = 'Open SafeKaki on Telegram and tap "Ask Kakis". Other users chat with you and vote. They never see your name or number.' }) {
+  if (!TELEGRAM_BOT_URL) return null;
+  return (
+    <a href={TELEGRAM_BOT_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 rounded-xl border-2 border-brand bg-sky-50 p-5 min-h-tap hover:bg-sky-100">
+      <span className="grid place-items-center w-12 h-12 rounded-full bg-brand text-white"><Icon name="users" className="w-7 h-7" /></span>
+      <span className="flex-1">
+        <span className="block font-bold">{title}</span>
+        <span className="block text-slate-700 text-[1.05rem] leading-snug">{hint}</span>
+      </span>
+      <Icon name="external" className="w-6 h-6 text-brand" />
+    </a>
+  );
 }

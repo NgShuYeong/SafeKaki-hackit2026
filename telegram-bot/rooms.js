@@ -95,7 +95,7 @@ export function createRooms({ dataDir, now = () => Date.now(), idleMs = ROOM_IDL
   }
 
   /** @returns {{ok:true, room, alias, rejoined:boolean} | {ok:false, reason:'gone'|'full'|'busy'|'removed'}} */
-  function join(code, userId) {
+  function join(code, userId, { demo = false } = {}) {
     const room = get(code);
     const id = String(userId);
     if (!room || room.closed) return { ok: false, reason: 'gone' };
@@ -104,7 +104,7 @@ export function createRooms({ dataDir, now = () => Date.now(), idleMs = ROOM_IDL
     if (userRoom.has(id)) return { ok: false, reason: 'busy' };
     if (room.members.size >= maxPeople) return { ok: false, reason: 'full' };
     let alias = room.aliases.get(id);
-    if (!alias) { alias = id === room.ownerId ? 'Asker' : `Kaki ${room.nextKaki++}`; room.aliases.set(id, alias); }
+    if (!alias) { alias = id === room.ownerId ? 'Asker' : `Kaki ${room.nextKaki++}${demo ? ' (demo)' : ''}`; room.aliases.set(id, alias); }
     const rejoined = room.everJoined.has(id);
     room.members.set(id, alias);
     room.everJoined.add(id);

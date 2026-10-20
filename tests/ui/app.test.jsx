@@ -15,6 +15,7 @@ beforeAll(async () => {
   const app = createApp({ readImage: (buf) => readImage(buf, { cfg: { apiKey: '' }, ocr: async () => ({ text: OCR_TEXT, confidence: 95 }) }) });
   await new Promise((r) => { server = app.listen(0, '127.0.0.1', r); });
   vi.stubEnv('VITE_API_BASE', `http://127.0.0.1:${server.address().port}`);
+  vi.stubEnv('VITE_TELEGRAM_BOT_URL', 'https://t.me/SafeKakiTestBot');
   App = (await import('../../src/App.jsx')).default;
 });
 afterAll(() => server.close());
@@ -281,5 +282,41 @@ describe('Screenshots', () => {
     await user.upload(screen.getByTestId('screenshot-input'), new File(['hello'], 'notes.txt', { type: 'text/plain' }));
     expect(await screen.findByText(/PNG or JPG screenshot/i)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+  });
+});
+
+describe('Usability extras', () => {
+  it('home links to the Kakis on Telegram', async () => {
+    await renderAt('#/');
+    const link = screen.getByRole('link', { name: /ask other people \(kakis\)/i });
+    expect(link.getAttribute('href')).toBe('https://t.me/SafeKakiTestBot');
+  });
+
+  it('the text size button makes all text bigger, then goes back to normal', async () => {
+    const user = userEvent.setup();
+    await renderAt('#/');
+    const btn = screen.getByRole('button', { name: /text size: normal/i });
+    await user.click(btn);
+    expect(document.documentElement.style.fontSize).toBe('115%');
+    await user.click(screen.getByRole('button', { name: /text size: large/i }));
+    expect(document.documentElement.style.fontSize).toBe('130%');
+    await user.click(screen.getByRole('button', { name: /text size: extra large/i }));
+    expect(document.documentElement.style.fontSize).toBe('100%');
+  });
+
+  it('the result can be read out loud, and the Kakis card is offered', async () => {
+    const spoken = [];
+    window.SpeechSynthesisUtterance = class { constructor(t) { this.text = t; } };
+    window.speechSynthesis = { speak: (u) => spoken.push(u.text), cancel: () => {} };
+    try {
+      const user = userEvent.setup();
+      await renderAt('#/check');
+      await user.type(screen.getByLabelText(/the message/i), OTP);
+      await user.click(screen.getByRole('button', { name: /check this message/i }));
+      await user.click(await screen.findByRole('button', { name: /read this out loud/i }));
+      expect(spoken[0]).toMatch(/High risk/);
+      expect(spoken[0]).toMatch(/What to do now/);
+      expect(screen.getByRole('link', { name: /still not sure\? ask other people/i })).toBeTruthy();
+    } finally { delete window.speechSynthesis; delete window.SpeechSynthesisUtterance; }
   });
 });

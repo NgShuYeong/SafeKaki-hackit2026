@@ -1,7 +1,5 @@
 import React from 'react';
-import { Icon, PageTitle } from '../components/ui.jsx';
-
-const TELEGRAM_URL = import.meta.env.VITE_TELEGRAM_BOT_URL;
+import { Icon, KakisCard, PageTitle, TELEGRAM_BOT_URL as TELEGRAM_URL } from '../components/ui.jsx';
 
 function Row({ to, icon, title, hint, tone }) {
   return (
@@ -25,6 +23,7 @@ export default function Home() {
       <a href="#/check" className="btn-primary w-full text-lg !min-h-[76px]"><Icon name="search" className="w-8 h-8" /> Check a message</a>
       <div className="mt-6 grid gap-4">
         <Row to="/help" icon="lifebuoy" tone="urgent" title="I have already been scammed" hint="Step-by-step help, starting with what to do first" />
+        <KakisCard title="Ask other people (Kakis)" hint="On Telegram, other SafeKaki users chat with you and vote on whether it is a scam. They never see your name or number." />
         <Row to="/report" icon="flag" title="Report a scam" hint="We prepare the report. You check it and send it." />
         <Row to="/share" icon="lock" title="Warn family safely" hint="We hide names and numbers before you pass it on" />
         <Row to="/learn" icon="book" title="Learn about common scams" hint="How they work and how to spot them" />

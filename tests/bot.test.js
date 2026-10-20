@@ -167,3 +167,27 @@ test('ticking several checkboxes in the report does not trigger the speed limit'
   await bot.handleUpdate(cb('si:done'));
   assert.ok(!tg.sent().some((m) => /going a bit fast|slow down/i.test(m.text)));
 });
+
+test('/start shows big bottom buttons, and tapping one works like the command', async () => {
+  const tg = mockTelegram(); const bot = mk(tg);
+  await bot.handleUpdate(msg('/start'));
+  const keys = tg.last().reply_markup.keyboard.flat().map((k) => k.text);
+  assert.ok(keys.includes('🗣 Ask Kakis') && keys.includes('🚨 I got scammed'));
+  assert.ok(!keys.includes('🌐 Website')); // no website link set
+  await bot.handleUpdate(msg('🚨 I got scammed'));
+  assert.match(tg.last().text, /speed matters/);
+  await bot.handleUpdate(msg('❓ Help'));
+  assert.match(tg.last().text, /What I can do/);
+});
+
+test('website link shows in the welcome and the /website command when set', async () => {
+  const tg = mockTelegram(); const bot = mk(tg, { websiteUrl: 'https://safekaki.example.sg' });
+  await bot.handleUpdate(msg('/start'));
+  assert.match(tg.last().text, /safekaki\.example\.sg/);
+  assert.ok(tg.last().reply_markup.keyboard.flat().some((k) => k.text === '🌐 Website'));
+  await bot.handleUpdate(msg('🌐 Website'));
+  assert.match(tg.last().text, /SafeKaki website/);
+  const tg2 = mockTelegram(); const bot2 = mk(tg2, { websiteUrl: '' });
+  await bot2.handleUpdate(msg('/website'));
+  assert.match(tg2.last().text, /not been set up/);
+});

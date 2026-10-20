@@ -127,8 +127,13 @@ function findNamesByRules(text) {
   const found = new Set()
   for (const re of NAME_PATTERNS) {
     for (const m of text.matchAll(re)) {
-      // Trim trailing words that are clearly not part of a name.
-      const words = m[1].split(/\s+/).filter((w) => !NOT_NAMES.has(w.toLowerCase()))
+      // Trim words that are clearly not part of a name, but only at the edges:
+      // "Dear Customer Tan" -> "Tan", while "Tan Ah Kow" keeps its "Ah".
+      const words = m[1].split(/\s+/)
+      const isNot = (w) => NOT_NAMES.has(w.toLowerCase())
+      // "Ah" starts many Singapore names (Ah Huat, Ah Lian), so keep it when a name follows.
+      while (words.length && isNot(words[0]) && !(words[0].toLowerCase() === 'ah' && words.length > 1)) words.shift()
+      while (words.length && isNot(words[words.length - 1])) words.pop()
       const name = words.join(' ')
       if (name && !NOT_NAMES.has(name.toLowerCase())) found.add(name)
     }
