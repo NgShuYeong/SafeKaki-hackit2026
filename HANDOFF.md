@@ -21,7 +21,7 @@ When the bot can't be sure, the user can ask other people. **Kakis** are users w
 
 **How it works**
 1. After a check, the user taps **🗣 Discuss with Kakis** (or types `/discuss`).
-2. The message is redacted (same rules as Warn family) and links are made unclickable (`hxxps://dbs-x[.]top`). The user sees a preview and taps **Open the room**.
+2. The message is redacted (same rules as Warn family) and links are made unclickable (`hxxps://dbs-x[.]test`). The user sees a preview and taps **Open the room**.
 3. Up to 8 free Kakis are pinged by DM, least recently pinged first. They tap **Join**. Kakis can also see open rooms with `/rooms`.
 4. Everyone gets a made-up name ("Asker", "Kaki 1", "Kaki 2"). Telegram names and numbers are never shown.
 5. Anything typed in the room is redacted and copied to everyone else. Text only, no photos. Other commands are paused until `/leave`.

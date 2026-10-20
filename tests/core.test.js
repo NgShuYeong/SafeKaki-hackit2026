@@ -31,7 +31,7 @@ test('user example messages are flagged at a sensible level', async () => {
   assert.notEqual(await lvl('Eh bro, your bank account kena locked already.'), 'insufficient_evidence');
   assert.equal(await lvl("Hi, I'm from the bank. Need your OTP to verify your account."), 'high_risk');
   assert.notEqual(await lvl('Eh, you need to pay now lah or your account will be blocked.'), 'insufficient_evidence');
-  assert.notEqual(await lvl('Your parcel kena stuck, click here to release. sg-post.top/x'), 'insufficient_evidence');
+  assert.notEqual(await lvl('Your parcel kena stuck, click here to release. sg-post.test/x'), 'insufficient_evidence');
 });
 
 test('"Can help me verify this link anot?" is not called a scam and is not called safe', async () => {
@@ -46,7 +46,7 @@ test('negated OTP warnings are not treated as requests', () => {
 });
 
 test('lookalike and shortened links are flagged without being visited', () => {
-  assert.ok(analyseUrl('dbs-sg-verify.xyz/login').flags.length >= 2);
+  assert.ok(analyseUrl('dbs-sg-verify.test/login').flags.length >= 2);
   assert.equal(analyseUrl('www.dbs.com.sg').owner, 'dbs');
   assert.ok(analyseUrl('bit.ly/abc').flags.some((f) => /shortened/i.test(f)));
   assert.equal(analyseUrl('https://www.iras.gov.sg/x').flags.length, 0);
@@ -94,7 +94,7 @@ test('callLlm maps provider errors to safe codes and never leaks bodies', async 
 });
 
 test('report: nothing invented, missing fields marked, prepared is not submitted', () => {
-  const r = buildReportDraft({ message: 'Hi from bank, need OTP, click dbs-verify.top/x', details: { category: 'bank_or_card_phishing', riskLevel: 'high_risk' } }).report;
+  const r = buildReportDraft({ message: 'Hi from bank, need OTP, click dbs-verify.test/x', details: { category: 'bank_or_card_phishing', riskLevel: 'high_risk' } }).report;
   assert.equal(r.status, 'prepared'); assert.equal(r.submitted, false);
   const get = (k) => r.fields.find((f) => f.key === k);
   assert.equal(get('incidentTime').status, 'missing');

@@ -3,7 +3,7 @@ import { analyzeMessage } from '../api.js';
 import { Callout, ErrorBox, Icon, KakisCard, MarkedMessage, MicButton, PageTitle, ReadAloudButton, ScreenshotButton, Spinner, levelStyle, onPasteImage } from '../components/ui.jsx';
 
 const EXAMPLES = [
-  'Eh bro, your bank account kena locked already. Click here to verify: dbs-sg-secure.top/login',
+  'Eh bro, your bank account kena locked already. Click here to verify: dbs-sg-secure.test/login',
   'Dinner at 7 lah, I already book the table at the usual place.',
   'Hi, I\'m from the bank. Need your OTP to verify your account.',
 ];

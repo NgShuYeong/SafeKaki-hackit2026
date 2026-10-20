@@ -7,12 +7,12 @@ import { createApp } from '../server/index.js';
 import { createBot } from '../telegram-bot/bot.js';
 import { analyzeMessage } from '../server/core/analyze.js';
 
-const SAMPLE = 'Hi Mary Tan, this is Officer David Lee. Call +65 9123 4567 or 1799. NRIC S1234567D. OTP is 482910. Card 4111 1111 1111 1111. Email kelly@mail.com. Blk 123 Ang Mo Kio Ave 3 #05-67. Click https://dbs-x.top/a';
+const SAMPLE = 'Hi Mary Tan, this is Officer David Lee. Call +65 9123 4567 or 1799. NRIC S1234567D. OTP is 482910. Card 4111 1111 1111 1111. Email kelly@mail.com. Blk 123 Ang Mo Kio Ave 3 #05-67. Click https://dbs-x.test/a';
 
 test('rules hide names, phones, NRIC, OTP, card, email and address but keep links and 1799', () => {
   const r = redactLocal(SAMPLE);
   for (const secret of ['Mary Tan', 'David Lee', '9123 4567', 'S1234567D', '482910', '4111', 'kelly@mail.com', 'Ang Mo Kio']) assert.ok(!r.text.includes(secret), secret);
-  assert.ok(r.text.includes('https://dbs-x.top/a'));
+  assert.ok(r.text.includes('https://dbs-x.test/a'));
   assert.ok(r.text.includes('1799'));
   assert.match(r.text, /OTP is \[CODE 1\]/);
   assert.match(describeHidden(r.items), /2 names/);

@@ -9,7 +9,7 @@ import { summarizeRoom, verdictLine } from '../server/core/summarize.js';
 import { analyzeMessage } from '../server/core/analyze.js';
 import { buildReportDraft } from '../server/core/report.js';
 
-const SCAM = 'Dear customer, your DBS account will be blocked today. Click https://dbs-secure.top/verify and send the OTP to Mr Tan Ah Kow at 9123 4567 now.';
+const SCAM = 'Dear customer, your DBS account will be blocked today. Click https://dbs-secure.test/verify and send the OTP to Mr Tan Ah Kow at 9123 4567 now.';
 
 function mockTelegram() {
   const calls = [];
@@ -45,7 +45,7 @@ async function openRoomWithKakis(t, kakis = [6, 7]) {
 }
 
 test('links are made unclickable, ordinary words are not touched', () => {
-  assert.equal(defangLinks('go to https://dbs-secure.top/verify now'), 'go to hxxps://dbs-secure[.]top/verify now');
+  assert.equal(defangLinks('go to https://dbs-secure.test/verify now'), 'go to hxxps://dbs-secure[.]test/verify now');
   assert.equal(defangLinks('see www.dbs.com.sg'), 'see www[.]dbs[.]com[.]sg');
   assert.equal(defangLinks('e.g. call 1799 at 3 p.m.'), 'e.g. call 1799 at 3 p.m.');
 });
@@ -81,7 +81,7 @@ test('full room: preview is redacted, Kakis are pinged, chat is relayed, summary
   await t.tap(5, 'rm:open');
   const preview = t.tg.lastTo(5).text;
   assert.ok(!preview.includes('9123 4567'), preview);
-  assert.match(preview, /hxxps:\/\/dbs-secure\[\.\]top/);
+  assert.match(preview, /hxxps:\/\/dbs-secure\[\.\]test/);
   await t.tap(5, 'rm:post');
   assert.match(t.tg.to(5).at(-1).text, /pinged 2 Kakis/);
   const ping = t.tg.lastTo(6);
@@ -93,11 +93,11 @@ test('full room: preview is redacted, Kakis are pinged, chat is relayed, summary
   assert.match(t.tg.lastTo(6).text, /You are in room .* as <b>Kaki 1<\/b>/);
   assert.match(t.tg.lastTo(5).text, /Kaki 1 joined/);
 
-  await t.say(5, 'they also called me from 8765 4321, the site is www.dbs-help.xyz');
+  await t.say(5, 'they also called me from 8765 4321, the site is www.dbs-help.test');
   const relayed = t.tg.lastTo(6).text;
   assert.match(relayed, /^<b>Asker:<\/b>/);
   assert.ok(!relayed.includes('8765 4321'), relayed);
-  assert.match(relayed, /dbs-help\[\.\]xyz/);
+  assert.match(relayed, /dbs-help\[\.\]test/);
   assert.equal(t.tg.to(7).length, 1 + 1, 'Kaki 7 did not join, so only got the ping (plus kk:on reply)');
 
   await t.say(6, 'Banks never ask for your OTP. Do not share it.');

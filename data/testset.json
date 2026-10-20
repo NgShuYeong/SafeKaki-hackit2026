@@ -1,7 +1,7 @@
 [
  {
   "id": "s01",
-  "text": "Eh bro, your bank account kena locked already. Click here to unlock: dbs-sg-secure.top/login",
+  "text": "Eh bro, your bank account kena locked already. Click here to unlock: dbs-sg-secure.test/login",
   "lang": "singlish",
   "truth": "scam"
  },
@@ -13,7 +13,7 @@
  },
  {
   "id": "s03",
-  "text": "Your parcel kena stuck, click here to release: sg-parcel-track.xyz/r",
+  "text": "Your parcel kena stuck, click here to release: sg-parcel-track.test/r",
   "lang": "singlish",
   "truth": "scam"
  },
@@ -25,7 +25,7 @@
  },
  {
   "id": "s05",
-  "text": "URGENT: Your SingPass has been suspended. Verify within 24 hours at singpass-verify.cc or your account will be terminated.",
+  "text": "URGENT: Your SingPass has been suspended. Verify within 24 hours at singpass-verify.test or your account will be terminated.",
   "lang": "english",
   "truth": "scam"
  },
@@ -55,25 +55,25 @@
  },
  {
   "id": "s10",
-  "text": "Please install the app from this link: update-bank.com/secure.apk to protect your account. Our officer will guide you with AnyDesk.",
+  "text": "Please install the app from this link: update-bank.test/secure.apk to protect your account. Our officer will guide you with AnyDesk.",
   "lang": "english",
   "truth": "scam"
  },
  {
   "id": "s11",
-  "text": "Your DBS card ending 1234 kena suspend liao. Pls key in your PIN and CVV at dbs-card-reactivate.sbs to reactivate leh.",
+  "text": "Your DBS card ending 1234 kena suspend liao. Pls key in your PIN and CVV at dbs-card-reactivate.test to reactivate leh.",
   "lang": "singlish",
   "truth": "scam"
  },
  {
   "id": "s12",
-  "text": "IRAS: You have a tax refund of $1,240. Claim now at iras-refund-sg.icu before it expires today.",
+  "text": "IRAS: You have a tax refund of $1,240. Claim now at iras-refund-sg.test before it expires today.",
   "lang": "english",
   "truth": "scam"
  },
  {
   "id": "s13",
-  "text": "Dear customer, your SingPost parcel is held. Pay redelivery fee $2.99 at singpost-redeliver.top",
+  "text": "Dear customer, your SingPost parcel is held. Pay redelivery fee $2.99 at singpost-redeliver.test",
   "lang": "english",
   "truth": "scam"
  },
@@ -85,13 +85,13 @@
  },
  {
   "id": "s15",
-  "text": "你的银行户口被冻结了,请马上点击链接验证 bank-verify-sg.top",
+  "text": "你的银行户口被冻结了,请马上点击链接验证 bank-verify-sg.test",
   "lang": "mixed",
   "truth": "scam"
  },
  {
   "id": "s16",
-  "text": "Encik, akaun bank anda akan disekat. Sila klik pautan ini dan masukkan OTP anda: maybank-sg-verify.xyz",
+  "text": "Encik, akaun bank anda akan disekat. Sila klik pautan ini dan masukkan OTP anda: maybank-sg-verify.test",
   "lang": "mixed",
   "truth": "scam"
  },
@@ -115,7 +115,7 @@
  },
  {
   "id": "s20",
-  "text": "Eh your Shopee order got problem, pls click shopee-refund-sg.vip to get refund or order will be cancelled",
+  "text": "Eh your Shopee order got problem, pls click shopee-refund-sg.test to get refund or order will be cancelled",
   "lang": "singlish",
   "truth": "scam"
  },
@@ -127,7 +127,7 @@
  },
  {
   "id": "s22",
-  "text": "Dear valued customer, we detected unusual activity. Log in at ocbc-secure-login.cfd to confirm your identity.",
+  "text": "Dear valued customer, we detected unusual activity. Log in at ocbc-secure-login.test to confirm your identity.",
   "lang": "english",
   "truth": "scam"
  },

@@ -42,7 +42,7 @@ test('example interaction: Singlish bank message -> warning, no certainty, do no
 
 test('forwarded message: sender name is captured as unconfirmed in the report', async () => {
   const tg = mockTelegram(); const bot = mk(tg);
-  await bot.handleUpdate(msg('Need your OTP to verify your DBS account click dbs-x.top/a', { forward_origin: { type: 'hidden_user', sender_user_name: 'DBS Support' } }));
+  await bot.handleUpdate(msg('Need your OTP to verify your DBS account click dbs-x.test/a', { forward_origin: { type: 'hidden_user', sender_user_name: 'DBS Support' } }));
   await bot.handleUpdate(cb('rp:start'));
   await bot.handleUpdate(cb('yn:moneyLost:0'));
   await bot.handleUpdate(cb('si:none'));
@@ -117,7 +117,7 @@ test('allow-list blocks other users when configured', async () => {
 
 test('/cancel deletes stored message; /privacy explains data handling', async () => {
   const tg = mockTelegram(); const bot = mk(tg);
-  await bot.handleUpdate(msg('Need your OTP now click a.top/x'));
+  await bot.handleUpdate(msg('Need your OTP now click a.test/x'));
   assert.ok(bot._states.has(5));
   await bot.handleUpdate(msg('/cancel'));
   assert.ok(!bot._states.has(5));
@@ -136,7 +136,7 @@ test('backend crash or Telegram send failure do not crash the bot or leak intern
 
 test('hostile text is HTML-escaped in every bot reply (no markup injection)', async () => {
   const { formatAnalysis, formatReportPreview } = await import('../telegram-bot/format.js');
-  const evil = '<a href="http://evil.top">click</a> & <b>x</b>';
+  const evil = '<a href="http://evil.test">click</a> & <b>x</b>';
   const a = { riskLevel: 'high_risk', headline: 'h', summary: evil, reasons: [evil], suspiciousPhrases: [{ text: evil }], links: [{ host: evil, warnings: [evil] }], nextSteps: [evil], missingInfo: [], notes: [], interpretation: { plainEnglish: evil }, disclaimer: evil, urgent: null };
   const out = formatAnalysis(a);
   assert.ok(!out.includes('<a href'));
@@ -146,7 +146,7 @@ test('hostile text is HTML-escaped in every bot reply (no markup injection)', as
   assert.ok(!rep.includes('<a href'));
   // end to end: the bot still replies normally to a message containing markup
   const tg = mockTelegram(); const bot = mk(tg);
-  await bot.handleUpdate(msg('Need your OTP <a href="http://evil.top">click</a> <b>now</b>'));
+  await bot.handleUpdate(msg('Need your OTP <a href="http://evil.test">click</a> <b>now</b>'));
   assert.ok(!tg.last().text.includes('<a href'));
 });
 
@@ -160,7 +160,7 @@ test('HTTP backend mode forwards to the API with the shared secret and client id
 
 test('ticking several checkboxes in the report does not trigger the speed limit', async () => {
   const tg = mockTelegram(); const bot = mk(tg, { ratePerMin: 8 });
-  await bot.handleUpdate(msg('Need your OTP to verify your DBS account click dbs-x.top/a'));
+  await bot.handleUpdate(msg('Need your OTP to verify your DBS account click dbs-x.test/a'));
   await bot.handleUpdate(cb('rp:start'));
   await bot.handleUpdate(cb('yn:moneyLost:0'));
   for (const k of ['otp', 'password', 'card', 'singpass', 'nric', 'other', 'otp', 'card']) await bot.handleUpdate(cb(`si:${k}`));

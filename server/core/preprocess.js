@@ -56,7 +56,7 @@ export function sanitizeInput(raw) {
 }
 
 // --- URL extraction -------------------------------------------------------
-const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"')\]]+|\b[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9-]{1,63})*\.(?:com|net|org|sg|info|biz|xyz|top|icu|cfd|sbs|click|vip|work|buzz|live|site|online|link|app|co|io|me|cc|ly|gl|to|tk|ml|ga|cf|gq|shop|store|cn|ru)\b(?:\/[^\s<>"')\]]*)?/gi;
+const URL_RE = /\b(?:https?:\/\/|www\.)[^\s<>"')\]]+|\b[a-z0-9][a-z0-9-]{0,62}(?:\.[a-z0-9-]{1,63})*\.(?:com|net|org|sg|info|biz|xyz|top|icu|cfd|sbs|click|vip|work|buzz|live|site|online|link|app|co|io|me|cc|ly|gl|to|tk|ml|ga|cf|gq|shop|store|cn|ru|test)\b(?:\/[^\s<>"')\]]*)?/gi;
 const FILE_LIKE = /\.(?:png|jpe?g|gif|pdf|docx?|xlsx?|txt|mp[34]|zip)$/i;
 
 export function extractUrls(text) {
@@ -77,7 +77,7 @@ export function extractUrls(text) {
 }
 
 const SHORTENERS = new Set(['bit.ly', 'tinyurl.com', 't.ly', 'cutt.ly', 'rb.gy', 'is.gd', 'goo.gl', 'ow.ly', 'shorturl.at', 's.id', 'tiny.cc', 'rebrand.ly', 'buff.ly', 'bl.ink', 'lnkd.in', 'wa.link', 't.co']);
-const RISKY_TLDS = new Set(['xyz', 'top', 'icu', 'cfd', 'sbs', 'click', 'vip', 'work', 'buzz', 'tk', 'ml', 'ga', 'cf', 'gq', 'cc', 'link', 'site', 'online', 'shop', 'store']);
+const RISKY_TLDS = new Set(['xyz', 'top', 'icu', 'cfd', 'sbs', 'click', 'vip', 'work', 'buzz', 'tk', 'ml', 'ga', 'cf', 'gq', 'cc', 'link', 'site', 'online', 'shop', 'store', 'test']); // .test = safe demo links (reserved, never a real website), scored like a scam ending
 
 // brand keyword -> legitimate registrable domains
 const BRANDS = {
@@ -106,7 +106,8 @@ export function analyseUrl(raw) {
   if (SHORTENERS.has(host)) flags.push('Shortened link hides its real destination');
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) flags.push('Uses a raw IP address instead of a name');
   if (host.includes('xn--')) flags.push('Uses look-alike (punycode) characters');
-  if (RISKY_TLDS.has(tld)) flags.push(`Uses the .${tld} ending, which is often used in scams`);
+  if (tld === 'test') flags.push('Uses a .test demo link (treated like a risky scam ending)');
+  else if (RISKY_TLDS.has(tld)) flags.push(`Uses the .${tld} ending, which is often used in scams`);
   if ((host.match(/-/g) || []).length >= 2) flags.push('Domain has many hyphens');
   if (parts.length >= 5) flags.push('Domain has many sub-parts');
 

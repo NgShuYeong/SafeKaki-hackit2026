@@ -245,7 +245,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
   const demoRooms = new Set();
   // /demo turns demo Kakis on for one person's own rooms. Kept in memory, so a restart turns it off.
   const demoUsers = new Set();
-  const DEMO_SAMPLE = 'DBS Alert: Your account has been blocked due to suspicious activity. Click https://dbs-sg-verify.top/login within 24 hours and enter the OTP we send you to unlock it, or your account will be closed.';
+  const DEMO_SAMPLE = 'DBS Alert: Your account has been blocked due to suspicious activity. Click https://dbs-sg-verify.test/login within 24 hours and enter the OTP we send you to unlock it, or your account will be closed.';
   async function demoCommand(chatId, userId) {
     const on = demoUsers.has(String(userId));
     return send(chatId, `🧪 <b>Demo</b> (only for you, other people are not affected)

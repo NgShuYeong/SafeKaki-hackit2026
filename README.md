@@ -103,7 +103,7 @@ npm run test:ui   # 20 UI tests: real React app against the real API in a simula
 npm run eval      # accuracy on data/testset.json: keyword baseline vs rules (vs AI if a key is set)
 ```
 
-To test the reporting workflow by hand: run `npm run dev:all`, open Check a message, paste `Hi, I'm from the bank. Need your OTP now. Click dbs-sg-verify.top/login`, then tap **Prepare a report**. Answer the questions, edit fields, tick the confirmation box and open the official pages.
+To test the reporting workflow by hand: run `npm run dev:all`, open Check a message, paste `Hi, I'm from the bank. Need your OTP now. Click dbs-sg-verify.test/login`, then tap **Prepare a report**. Answer the questions, edit fields, tick the confirmation box and open the official pages.
 
 ## Official resources used
 

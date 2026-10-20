@@ -28,7 +28,7 @@ function writeJson(file, data) {
   } catch { /* saving is best effort; the bot keeps working from memory */ }
 }
 
-/** Makes links in room chat unclickable, e.g. https://dbs-x.top -> hxxps://dbs-x[.]top */
+/** Makes links in room chat unclickable, e.g. https://dbs-x.test -> hxxps://dbs-x[.]test */
 export function defangLinks(text) {
   return String(text)
     .replace(/\bhttp(s?):\/\//gi, 'hxxp$1://')

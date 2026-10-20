@@ -117,7 +117,7 @@ describe('Check a message', () => {
 describe('Report flow', () => {
   async function toReport(user) {
     await renderAt('#/check');
-    await user.type(screen.getByLabelText(/the message/i), "Hi, I'm from the bank. Need your OTP now. Click dbs-sg-verify.top/login");
+    await user.type(screen.getByLabelText(/the message/i), "Hi, I'm from the bank. Need your OTP now. Click dbs-sg-verify.test/login");
     await user.click(screen.getByRole('button', { name: /check this message/i }));
     await user.click(await screen.findByRole('link', { name: /prepare a report/i }));
   }
@@ -216,13 +216,13 @@ describe('Warn family safely (merged from 12 Oct build)', () => {
   it('hides private details, keeps the link, and builds a family message', async () => {
     const user = userEvent.setup();
     await renderAt('#/share');
-    await user.type(screen.getByLabelText(/^the message/i), 'Hi Mary Tan, call 9123 4567 and give OTP is 482910. https://dbs-x.top/a');
+    await user.type(screen.getByLabelText(/^the message/i), 'Hi Mary Tan, call 9123 4567 and give OTP is 482910. https://dbs-x.test/a');
     await user.type(screen.getByLabelText(/other names to hide/i), 'Ah Seng');
     await user.click(screen.getByRole('button', { name: /hide private info/i }));
     expect(await screen.findByText(/hidden: .*phone number/i)).toBeTruthy();
     const family = screen.getByLabelText(/message for your family/i).textContent;
     expect(family).toMatch(/\[PHONE 1\]/);
-    expect(family).toMatch(/https:\/\/dbs-x\.top\/a/);
+    expect(family).toMatch(/https:\/\/dbs-x\.test\/a/);
     expect(family).not.toMatch(/9123 4567|482910|Mary Tan/);
     const wa = screen.getByRole('link', { name: /send on whatsapp/i }).getAttribute('href');
     expect(wa).toMatch(/^https:\/\/wa\.me\/\?text=/);
