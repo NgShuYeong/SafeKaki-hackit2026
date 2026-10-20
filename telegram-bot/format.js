@@ -58,6 +58,14 @@ export const BUTTONS = {
   help: '❓ Help',
   website: '🌐 Website',
 };
+// While someone is in a room, the bottom buttons switch to these, so they never have to scroll up.
+export const ROOM_BUTTONS = { vote: '🗳 Vote', report: '⚠️ Report someone', leave: '🚪 Leave room' };
+export const roomKeyboard = () => ({
+  keyboard: [[{ text: ROOM_BUTTONS.vote }, { text: ROOM_BUTTONS.report }], [{ text: ROOM_BUTTONS.leave }]],
+  resize_keyboard: true,
+  is_persistent: true,
+  input_field_placeholder: 'Type a message to the room',
+});
 export function mainKeyboard(websiteUrl) {
   return {
     keyboard: [
@@ -207,7 +215,7 @@ export function formatRoomWelcome(room, alias, count) {
     `${count} ${count === 1 ? 'person is' : 'people are'} here. Anything you type now goes to everyone in the room.`,
     '• Be kind. Do not share your own private details.',
     '• Do not open links from the message, even to "test" them.',
-    '• Tap 🗳 Vote when you have made up your mind, and /leave when you are done.',
+    '• Use the buttons at the bottom of the screen: <b>🗳 Vote</b> when you have made up your mind, <b>🚪 Leave room</b> when you are done.',
   ].join('\n');
 }
 

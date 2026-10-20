@@ -78,7 +78,7 @@ export function createRooms({ dataDir, now = () => Date.now(), idleMs = ROOM_IDL
   const openRooms = () => [...rooms.values()].filter((r) => !r.closed);
   const others = (room, userId) => [...room.members.keys()].filter((id) => id !== String(userId));
 
-  function create({ ownerId, original, riskLevel, category, headline }) {
+  function create({ ownerId, original, riskLevel, category, headline, demo = false, demoFor = null }) {
     const code = newCode();
     const t = now();
     const room = {
@@ -88,9 +88,10 @@ export function createRooms({ dataDir, now = () => Date.now(), idleMs = ROOM_IDL
       everJoined: new Set(), removed: new Set(), reports: new Map(), // userId -> Set(reporterIds)
       votes: new Map(), transcript: [], nextKaki: 1,
       createdAt: t, lastActivity: t, closed: false,
+      demoFor: demoFor == null ? null : String(demoFor), // Kaki demo: the real person this pretend room was made for
     };
     rooms.set(code, room);
-    join(code, ownerId);
+    join(code, ownerId, { demo });
     return room;
   }
 
@@ -104,7 +105,7 @@ export function createRooms({ dataDir, now = () => Date.now(), idleMs = ROOM_IDL
     if (userRoom.has(id)) return { ok: false, reason: 'busy' };
     if (room.members.size >= maxPeople) return { ok: false, reason: 'full' };
     let alias = room.aliases.get(id);
-    if (!alias) { alias = id === room.ownerId ? 'Asker' : `Kaki ${room.nextKaki++}${demo ? ' (demo)' : ''}`; room.aliases.set(id, alias); }
+    if (!alias) { alias = (id === room.ownerId ? 'Asker' : `Kaki ${room.nextKaki++}`) + (demo ? ' (demo)' : ''); room.aliases.set(id, alias); }
     const rejoined = room.everJoined.has(id);
     room.members.set(id, alias);
     room.everJoined.add(id);

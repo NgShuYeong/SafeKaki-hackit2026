@@ -105,7 +105,7 @@ test('full room: preview is redacted, Kakis are pinged, chat is relayed, summary
 
   // While in a room, other commands are paused.
   await t.say(6, '/tips');
-  assert.match(t.tg.lastTo(6).text, /type \/leave first/);
+  assert.match(t.tg.lastTo(6).text, /tap 🚪 Leave room first/);
 
   await t.tap(6, `rm:vote:${code}:scam`);
   await t.say(5, '/leave');
@@ -253,12 +253,14 @@ test('without demo mode, no Kakis means no room', async () => {
   } finally { t.bot.stop(); }
 });
 
-test('/demo turns demo Kakis on for that person only, and /demo again turns it off', async () => {
+test('/demo asker demo is only for that person, and can be turned off', async () => {
   const t = setup({});
   try {
     await t.say(5, '/demo');
-    assert.match(t.tg.lastTo(5).text, /Demo mode is on/);
-    await t.tap(5, 'demo:sample'); // sample scam message is checked
+    assert.match(t.tg.lastTo(5).text, /Demo as a Kaki/);
+    await t.tap(5, 'demo:asker');
+    assert.match(t.tg.lastTo(5).text, /Asker demo is on/);
+    await t.tap(5, 'demo:sample'); // the sample scam message is checked
     assert.ok(t.tg.to(5).some((b) => /High risk/i.test(b.text)));
     await t.tap(5, 'rm:open');
     await t.tap(5, 'rm:post'); // no real Kakis, but the room still opens
@@ -272,6 +274,58 @@ test('/demo turns demo Kakis on for that person only, and /demo again turns it o
     await t.tap(8, 'rm:post');
     assert.match(t.tg.lastTo(8).text, /no Kakis are free/);
     await t.say(5, '/demo');
+    assert.ok(t.tg.buttons(t.tg.lastTo(5)).some((b) => b.callback_data === 'demo:off'));
+    await t.tap(5, 'demo:off');
     assert.match(t.tg.lastTo(5).text, /Demo mode is <b>off<\/b>/);
+  } finally { t.bot.stop(); }
+});
+
+test('in a room, Vote / Report / Leave are the bottom buttons, and the normal buttons come back after leaving', async () => {
+  const t = setup();
+  try {
+    const code = await openRoomWithKakis(t);
+    const welcome = t.tg.to(5).find((b) => /You are in room/.test(b.text));
+    const keys = welcome.reply_markup.keyboard.flat().map((k) => k.text);
+    assert.deepEqual(keys, ['🗳 Vote', '⚠️ Report someone', '🚪 Leave room']);
+    await t.tap(6, `rm:join:${code}`);
+    await t.say(5, '🗳 Vote'); // a button tap, not a chat message
+    assert.match(t.tg.lastTo(5).text, /What do you think/);
+    assert.ok(!t.tg.to(6).some((b) => /🗳 Vote/.test(b.text || '') && /Asker/.test(b.text)));
+    await t.say(5, '⚠️ Report someone');
+    assert.ok(t.tg.buttons(t.tg.lastTo(5)).some((b) => b.text === 'Kaki 1'));
+    await t.say(5, '🚪 Leave room');
+    await t.tap(5, `rm:bye:${code}:scam`);
+    const left = t.tg.to(5).find((b) => /You left room/.test(b.text));
+    assert.ok(left.reply_markup.keyboard.flat().some((k) => k.text === '🗣 Ask Kakis'));
+    await t.say(5, '🚪 Leave room'); // an old button tapped outside a room
+    assert.match(t.tg.lastTo(5).text, /not in a discussion room/);
+  } finally { t.bot.stop(); }
+});
+
+test('/demo Kaki demo: a pretend asker pings you, you join and chat, then you get a summary', async () => {
+  const t = setup();
+  try {
+    await t.say(5, '/demo');
+    await t.tap(5, 'demo:kaki');
+    await t.bot._demoDone();
+    const ping = t.tg.lastTo(5);
+    assert.match(ping.text, /needs a second opinion/);
+    assert.match(ping.text, /\[NAME 1\]/); // "Mr Tan Ah Kow" is hidden
+    assert.ok(!ping.text.includes('9123 4567'));
+    const code = t.tg.buttons(ping).find((b) => b.callback_data?.startsWith('rm:join:')).callback_data.split(':')[2];
+    await t.tap(5, `rm:join:${code}`); // works even though 5 is not a Kaki
+    assert.match(t.tg.lastTo(5).text, /You are in room/);
+    await t.say(5, 'Real jobs never ask for a deposit. Do not add him.');
+    await t.bot._demoDone();
+    const seen = t.tg.to(5).map((b) => b.text).join('\n');
+    assert.match(seen, /Asker \(demo\):<\/b> Hi, thanks for joining/);
+    assert.match(seen, /Kaki 2 \(demo\):<\/b> Ya, real jobs/);
+    assert.match(seen, /Asker \(demo\) voted 🚩 Scam and left/);
+    await t.say(5, '🚪 Leave room');
+    await t.tap(5, `rm:bye:${code}:scam`);
+    const summary = t.tg.to(5).map((b) => b.text).find((x) => x.includes('Summary of room'));
+    assert.ok(summary);
+    assert.match(summary, /3 of 3 Kakis think it is a scam/);
+    assert.ok(!t.tg.calls.some((c) => String(c.body.chat_id || '').startsWith('demo-')));
   } finally { t.bot.stop(); }
 });

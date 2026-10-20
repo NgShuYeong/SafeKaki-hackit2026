@@ -75,7 +75,10 @@ npm run dev:all      (website at http://localhost:5173, in a second window)
 ```
 
 ## Demoing the rooms
-- **With one phone (easiest):** type `/demo` in the bot. Demo Kakis are switched on for your own rooms only, and everyone else's rooms stay normal. Tap **📩 Use a sample scam message** (or send your own), then 🗣 Discuss with Kakis → Open the room. Type `/demo` again to turn it off. A bot restart also turns it off. `/demo` is not in the command menu.
+- **With one phone (easiest):** type `/demo` in the bot and pick one:
+  - **📩 Demo as the asker:** turns on pretend Kakis for your own rooms only. Tap **📩 Use a sample scam message** (or send your own), then 🗣 Discuss with Kakis → Open the room. 2 pretend Kakis join, chat, vote and leave. `/demo` → **🛑 Turn demo off** to stop it. A bot restart also turns it off.
+  - **🙋 Demo as a Kaki:** a pretend asker opens a room (a fake Shopee job scam) and pings you. Tap Join and chat. The pretend asker replies to what you type, and a pretend Kaki 2 joins. You don't need to be a Kaki for this.
+  - `/demo` is not in the command menu. A room with only pretend people left in it closes by itself.
 - **For everyone's rooms:** add `DEMO_KAKIS=1` to `.env` and restart the bot. Every new room then gets 2 pretend Kakis, "Kaki 1 (demo)" and "Kaki 2 (demo)". They join a few seconds apart, comment on the message, vote and leave. Then vote and `/leave` yourself to get the summary. Real Kakis are still pinged and can join too. Summaries from demo rooms are saved with `"demo": true`. Turn it off again after judging.
 - **With two phones:** you need **two Telegram accounts** (two phones, or a phone plus Telegram Desktop).
 - On the second account: open the bot, tap Start, then `/kaki` → **Join as a Kaki**. Telegram doesn't let bots message people who haven't started them.
@@ -86,9 +89,10 @@ npm run dev:all      (website at http://localhost:5173, in a second window)
 - **"Ah" names fixed:** "Mr Tan Ah Kow", "Hi Ah Huat" and "Uncle Ah Seng" are now hidden in full without an AI key.
 - **Demo Kakis:** see "Demoing the rooms".
 - **Bot buttons:** `/start` shows big buttons that stay at the bottom of the chat (🔍 Check a message, 🗣 Ask Kakis, 🚨 I got scammed, 🔒 Warn family, ❓ Help, and 🌐 Website if a website address is set). The welcome message is now 3 short steps, and the full list moved to ❓ Help (`/help`). `/scammed` also works from inside a room.
+- **Room buttons at the bottom:** in a room, the bottom buttons switch to 🗳 Vote, ⚠️ Report someone and 🚪 Leave room, so nobody has to scroll up in a long chat. The normal buttons come back after leaving, on the summary, or if removed.
 - **Voice notes:** they get a clear "I can't listen to voice notes yet" reply that mentions 1799.
 - **Website:** a text size button in the header (Normal, Large, Extra large, remembered on that device), a 🔊 "Read this out loud" button on results, and an "Ask other people (Kakis)" card on Home and on results. The card only shows when `VITE_TELEGRAM_BOT_URL` is set.
-- Tests: 75 backend and 23 UI, all passing.
+- Tests: 78 backend and 23 UI, all passing.
 
 ## Where things stand (20 Oct)
 - **Discussion rooms are done and tested.** All 69 backend tests pass. The UI tests weren't re-run after the change (no website files were touched); run `npm run test:ui` to confirm.

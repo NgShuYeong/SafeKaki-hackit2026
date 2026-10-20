@@ -32,6 +32,7 @@ const COMMANDS = [
 const BUTTON_COMMANDS = {
   [F.BUTTONS.check]: '/check', [F.BUTTONS.kakis]: '/discuss', [F.BUTTONS.scammed]: '/scammed',
   [F.BUTTONS.share]: '/share', [F.BUTTONS.help]: '/help', [F.BUTTONS.website]: '/website',
+  [F.ROOM_BUTTONS.vote]: '/vote', [F.ROOM_BUTTONS.report]: '/reportperson', [F.ROOM_BUTTONS.leave]: '/leave',
 };
 
 export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, apiBase = process.env.TELEGRAM_API_BASE || 'https://api.telegram.org', allowedUserIds = (process.env.TELEGRAM_ALLOWED_USER_IDS || '').split(',').map((s) => s.trim()).filter(Boolean), ratePerMin = Number(process.env.BOT_RATE_LIMIT_PER_MIN) || 8, log = console.log, dataDir = DEFAULT_DATA_DIR, roomOptions = {}, demoKakis = process.env.DEMO_KAKIS === '1', demoDelayMs = Number(process.env.DEMO_KAKIS_DELAY_MS) || 3500, websiteUrl = (process.env.SAFEKAKI_WEBSITE_URL || '').trim() } = {}) {
@@ -170,7 +171,17 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
 
   // ---- Kaki discussion rooms ----
   // A room lives inside each person's private chat with the bot; the bot copies messages between them.
-  const roomMenu = (code) => kb([[{ text: '🗳 Vote', callback_data: `rm:vmenu:${code}` }, { text: '⚠️ Report someone', callback_data: `rm:repmenu:${code}` }], [{ text: '🚪 Leave room', callback_data: 'rm:leave' }]]);
+  // In a room, the bottom buttons become Vote / Report / Leave; they switch back when the person leaves.
+  const roomMenu = () => ({ reply_markup: F.roomKeyboard() });
+  const mainMenu = () => ({ reply_markup: F.mainKeyboard(websiteUrl) });
+  const voteMenu = (chatId, code) => send(chatId, '🗳 What do you think? You can change your vote until the room closes.', kb(voteRow(code, 'rm:vote')));
+  function reportMenu(chatId, userId, code) {
+    const room = rooms.get(code);
+    if (!room || !room.members.has(String(userId))) return send(chatId, 'That room has closed.', mainMenu());
+    const names = [...room.members.entries()].filter(([id]) => id !== String(userId)).map(([, a]) => a);
+    if (!names.length) return send(chatId, 'Nobody else is in the room.');
+    return send(chatId, '⚠️ Who is being rude, spamming, or asking for private details? If 2 people report the same person, they are removed.', kb(names.map((a) => [{ text: a, callback_data: `rm:rep:${code}:${a}` }])));
+  }
   const voteRow = (code, prefix) => [[{ text: '🚩 Scam', callback_data: `${prefix}:${code}:scam` }, { text: '🤔 Not sure', callback_data: `${prefix}:${code}:unsure` }, { text: '✅ Looks real', callback_data: `${prefix}:${code}:real` }]];
   const cleanForRoom = (text) => defangLinks(redactLocal(text).text);
   async function tellRoom(room, html, exceptId) {
@@ -205,7 +216,7 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
     touch(chatId, { roomDraft: null });
     const pinged = helpers.length ? `🔔 I pinged ${helpers.length} ${helpers.length === 1 ? 'Kaki' : 'Kakis'}. I will tell you when someone joins.` : '';
     const demoNote = demo ? '🧪 <b>Demo mode:</b> 2 pretend Kakis will join in a few seconds to show how a room works.' : '';
-    await send(chatId, F.formatRoomWelcome(room, 'Asker', 1) + '\n\n' + [pinged, demoNote].filter(Boolean).join('\n'), roomMenu(room.code));
+    await send(chatId, F.formatRoomWelcome(room, 'Asker', 1) + '\n\n' + [pinged, demoNote].filter(Boolean).join('\n'), roomMenu());
     for (const id of helpers) await send(id, F.formatRoomPing(room), kb([[{ text: '🙋 Join', callback_data: `rm:join:${room.code}` }]]));
     if (demo) lastDemo = runDemo(room.code).catch((e) => log(`demo failed: ${e.message}`));
   }
@@ -234,21 +245,98 @@ export function createBot({ token, backend = makeBackend(), fetchImpl = fetch, a
   const demoUsers = new Set();
   const DEMO_SAMPLE = 'DBS Alert: Your account has been blocked due to suspicious activity. Click https://dbs-sg-verify.top/login within 24 hours and enter the OTP we send you to unlock it, or your account will be closed.';
   async function demoCommand(chatId, userId) {
+    const on = demoUsers.has(String(userId));
+    return send(chatId, `🧪 <b>Demo</b> (only for you, other people are not affected)
+
+<b>📩 Demo as the asker:</b> you open a room about a scam message, and 2 pretend Kakis join, chat, vote and leave.
+<b>🙋 Demo as a Kaki:</b> a pretend asker opens a room and pings you. You join, help them decide, and they reply.${on ? '\n\nAsker demo is <b>on</b> for your rooms.' : ''}`, kb([
+      [{ text: '📩 Demo as the asker', callback_data: 'demo:asker' }],
+      [{ text: '🙋 Demo as a Kaki', callback_data: 'demo:kaki' }],
+      ...(on ? [[{ text: '🛑 Turn demo off', callback_data: 'demo:off' }]] : []),
+    ]));
+  }
+  async function demoCallback(chatId, userId, act) {
     const id = String(userId);
-    if (demoUsers.has(id)) { demoUsers.delete(id); return send(chatId, '🧪 Demo mode is <b>off</b>. Your rooms will only have real Kakis again.'); }
-    demoUsers.add(id);
-    return send(chatId, `🧪 <b>Demo mode is on</b> (only for you).
+    if (rooms.roomOf(userId) && act !== 'off') return send(chatId, 'You are in a room. Tap 🚪 Leave room first.');
+    if (act === 'off') { demoUsers.delete(id); return send(chatId, '🧪 Demo mode is <b>off</b>. Your rooms will only have real Kakis again.', mainMenu()); }
+    if (act === 'sample') {
+      await send(chatId, `📩 Sample message:\n<pre>${F.esc(DEMO_SAMPLE)}</pre>`);
+      return analyseAndReply(chatId, userId, DEMO_SAMPLE);
+    }
+    if (act === 'asker') {
+      demoUsers.add(id);
+      return send(chatId, `🧪 <b>Asker demo is on</b> (only for you).
 
-When you open a room, 2 pretend Kakis will join, chat, vote and leave, so you can show how a room works with one phone. Real Kakis are still pinged too.
-
-How to run it:
 1. Send or forward a scam message, or tap the button below to use a sample.
 2. Tap <b>🗣 Discuss with Kakis</b>, then <b>✅ Open the room</b>.
-3. Watch the Kakis join. Then vote and /leave to get the summary.
+3. Watch 2 pretend Kakis join and chat. Then tap <b>🗳 Vote</b> and <b>🚪 Leave room</b> to get the summary.
 
-Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message', callback_data: 'demo:sample' }]]));
+Type /demo to turn it off.`, kb([[{ text: '📩 Use a sample scam message', callback_data: 'demo:sample' }]]));
+    }
+    if (act === 'kaki') {
+      await send(chatId, '🧪 <b>Kaki demo</b>\nIn a few seconds, a pretend asker will open a room and ping you, the same way real Kakis get pinged. Tap <b>🙋 Join</b> when it arrives.');
+      lastDemo = startKakiDemo(chatId, userId).catch((e) => log(`demo failed: ${e.message}`)); // not awaited, so other people's messages are not held up
+    }
   }
+
+  // ---- Kaki demo: a pretend asker opens a room for one real person ----
+  const KAKI_SAMPLE = 'Hi, this is Mr Tan Ah Kow from Shopee HR. We have a part-time job for you, earn $300 a day just by liking products online. Add me on WhatsApp +65 9123 4567 to start. You only need to pay a $50 deposit first.';
   let lastDemo = Promise.resolve();
+  const kakiDemos = new Map(); // room code -> { waiting: function | null }
+  function waitForReply(code, ms) {
+    return new Promise((resolve) => {
+      const st = kakiDemos.get(code);
+      if (!st) return resolve(false);
+      const t = setTimeout(() => { st.waiting = null; resolve(false); }, ms);
+      st.waiting = () => { clearTimeout(t); st.waiting = null; resolve(true); };
+    });
+  }
+  async function startKakiDemo(chatId, userId) {
+    await new Promise((r) => setTimeout(r, demoDelayMs));
+    if (rooms.roomOf(userId)) return;
+    let a = null;
+    try { const r = await backend.analyze({ message: KAKI_SAMPLE, clientId: userId }); if (r?.ok) a = r.analysis; } catch { /* the room still works without it */ }
+    const room = rooms.create({ ownerId: `demo-asker-${userId}-${Date.now()}`, original: cleanForRoom(KAKI_SAMPLE), riskLevel: a?.riskLevel || 'suspicious', category: a?.scamCategory, headline: a?.headline, demo: true, demoFor: userId });
+    demoRooms.add(room.code);
+    kakiDemos.set(room.code, { waiting: null });
+    await send(chatId, F.formatRoomPing(room) + '\n\n🧪 <i>Demo: this asker is pretend.</i>', kb([[{ text: '🙋 Join', callback_data: `rm:join:${room.code}` }]]));
+  }
+  async function runKakiDemo(code) {
+    const alive = () => { const r = rooms.get(code); return r && !r.closed ? r : null; };
+    const wait = () => new Promise((r) => setTimeout(r, demoDelayMs));
+    const room = alive();
+    if (!room) return;
+    const asker = room.ownerId;
+    const k2 = `demo-${code}-2`;
+    const sayAs = async (id, text) => {
+      const said = rooms.say(id, cleanForRoom(text));
+      if (said) for (const to of said.to) await send(to, F.roomLine(said.alias, said.text));
+    };
+    await wait(); if (!alive()) return;
+    await sayAs(asker, 'Hi, thanks for joining! I got this on WhatsApp just now. The pay sounds very good leh. Is it real? Should I add him?');
+    const replied = await waitForReply(code, demoDelayMs * 8); // give the real Kaki time to type
+    if (!alive()) return;
+    await sayAs(asker, replied ? 'Oh, I did not think of that. So I should not pay the deposit, right?' : 'Hello? Anyone here? Is this one a scam?');
+    await wait(); if (!alive()) return;
+    const j = rooms.join(code, k2, { demo: true });
+    if (j.ok) await tellRoom(j.room, F.roomNotice(`${j.alias} joined. ${j.room.members.size} people are here.`), k2);
+    await wait(); if (!alive()) return;
+    if (j.ok) await sayAs(k2, 'Ya, real jobs never ask you to pay a deposit first. Easy money for just liking products is a well-known job scam.');
+    await waitForReply(code, demoDelayMs * 6);
+    await wait(); if (!alive()) return;
+    await sayAs(asker, 'Thank you both! I will not reply him. I will block the number and report it on ScamShield.');
+    for (const id of [k2, asker]) {
+      await wait(); if (!alive()) return;
+      if (!rooms.vote(code, id, 'scam')) continue;
+      const left = rooms.leave(id);
+      if (!left) continue;
+      if (left.empty) return closeRoom(code, 'empty');
+      const n = left.room.members.size;
+      await tellRoom(left.room, F.roomNotice(`${left.alias} voted 🚩 Scam and left. ${n} ${n === 1 ? 'person is' : 'people are'} still here.`));
+    }
+    const r = alive();
+    if (r) await tellRoom(r, F.roomNotice('Demo: tap 🗳 Vote, then 🚪 Leave room to see the summary.'));
+  }
   async function runDemo(code) {
     demoRooms.add(code);
     const alive = () => { const r = rooms.get(code); return r && !r.closed ? r : null; };
@@ -285,15 +373,18 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
   }
 
   async function joinRoom(chatId, userId, code) {
-    if (!rooms.isHelper(userId)) return send(chatId, 'Only Kakis can join rooms. Tap /kaki to become one.');
+    const demoRoom = rooms.get(code);
+    const isMyDemo = demoRoom?.demoFor && demoRoom.demoFor === String(userId);
+    if (!rooms.isHelper(userId) && !isMyDemo) return send(chatId, 'Only Kakis can join rooms. Tap /kaki to become one.');
     const r = rooms.join(code, userId);
     if (!r.ok) {
       const why = { gone: 'That room has already closed. Thank you for offering to help!', full: 'That room is full. Thank you for offering to help!', busy: 'You are already in another room. Type /leave first.', removed: 'You cannot rejoin this room.' };
       return send(chatId, why[r.reason]);
     }
     const { room, alias } = r;
-    await send(chatId, F.formatRoomWelcome(room, alias, room.members.size), roomMenu(room.code));
+    await send(chatId, F.formatRoomWelcome(room, alias, room.members.size), roomMenu());
     await tellRoom(room, F.roomNotice(`${alias} ${r.rejoined ? 'came back' : 'joined'}. ${room.members.size} people are here.`), userId);
+    if (isMyDemo && !r.rejoined) lastDemo = runKakiDemo(room.code).catch((e) => log(`demo failed: ${e.message}`));
   }
 
   async function askBeforeLeaving(chatId, userId) {
@@ -307,8 +398,9 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
     const left = rooms.leave(userId);
     if (!left) return send(chatId, 'You are not in a discussion room.');
     const { room, alias, empty } = left;
-    await send(chatId, `🚪 You left room #${room.code}. I will send you the summary when the room closes.`);
-    if (empty) return closeRoom(room.code, 'empty');
+    await send(chatId, `🚪 You left room #${room.code}. I will send you the summary when the room closes.`, mainMenu());
+    // A room with only pretend (demo) people left in it closes too.
+    if (empty || [...room.members.keys()].every(isDemoId)) return closeRoom(room.code, 'empty');
     await tellRoom(room, F.roomNotice(`${alias} left. ${room.members.size} ${room.members.size === 1 ? 'person is' : 'people are'} still here.`));
   }
 
@@ -323,7 +415,8 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
     if (!summary) summary = await summarizeRoom(snap, { cfg: { apiKey: '' } }); // rules-only fallback
     snap.transcript = []; // the chat log is not kept
     const text = F.formatRoomSummary(code, reason, summary);
-    for (const id of snap.recipients) await send(id, text);
+    for (const id of snap.recipients) await send(id, text, mainMenu());
+    kakiDemos.delete(code);
     const demo = demoRooms.delete(code);
     rooms.saveSummary({ code, closedAt: new Date().toISOString(), ...(demo ? { demo: true } : {}), reason, message: snap.original, riskLevel: snap.riskLevel, category: snap.category || null, votes: summary.counts, points: summary.points, method: summary.method, messages: summary.messageCount, people: snap.peopleCount });
   }
@@ -341,6 +434,8 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
     const room = rooms.roomOf(userId);
     if (cmd) {
       if (cmd === '/leave') return askBeforeLeaving(chatId, userId);
+      if (cmd === '/vote') return voteMenu(chatId, room.code);
+      if (cmd === '/reportperson') return reportMenu(chatId, userId, room.code);
       if (cmd === '/end') {
         if (room.ownerId !== String(userId)) return send(chatId, 'Only the person who opened the room can close it. You can /leave any time.');
         await tellRoom(room, F.roomNotice('The asker closed the room.'), userId);
@@ -348,12 +443,13 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
       }
       if (cmd === '/privacy') return send(chatId, F.PRIVACY);
       if (cmd === '/scammed') return urgentMenu(chatId); // urgent help is never blocked by a room
-      return send(chatId, `You are in room #${room.code}. Anything you type goes to the room. To do something else, type /leave first.`, roomMenu(room.code));
+      return send(chatId, `You are in room #${room.code}. Anything you type goes to the room. To do something else, tap 🚪 Leave room first.`, roomMenu());
     }
     const rl = roomChatLimiter.check(`c:${userId}`);
     if (!rl.allowed) return send(chatId, `You are typing a bit fast. Please wait ${rl.retryAfterSec} seconds.`);
     const said = rooms.say(userId, cleanForRoom(text));
     for (const id of said.to) await send(id, F.roomLine(said.alias, said.text));
+    kakiDemos.get(room.code)?.waiting?.(); // a pretend asker is waiting for the real Kaki to reply
   }
 
   async function roomCallback(q, chatId, userId) {
@@ -364,7 +460,7 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
     if (act === 'join') return joinRoom(chatId, userId, code);
     if (act === 'leave') return askBeforeLeaving(chatId, userId);
     if (act === 'stay') return send(chatId, 'OK, you are still in the room.');
-    if (act === 'vmenu') return send(chatId, '🗳 What do you think? You can change your vote until the room closes.', kb(voteRow(code, 'rm:vote')));
+    if (act === 'vmenu') return voteMenu(chatId, code);
     if (act === 'vote' || act === 'bye') {
       if (arg !== 'skip') {
         const ok = rooms.vote(code, userId, arg);
@@ -374,19 +470,13 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
       if (act === 'bye' && rooms.roomOf(userId)?.code === code) return leaveRoom(chatId, userId);
       return;
     }
-    if (act === 'repmenu') {
-      const room = rooms.get(code);
-      if (!room || !room.members.has(String(userId))) return send(chatId, 'That room has closed.');
-      const names = [...room.members.entries()].filter(([id]) => id !== String(userId)).map(([, a]) => a);
-      if (!names.length) return send(chatId, 'Nobody else is in the room.');
-      return send(chatId, '⚠️ Who is being rude, spamming, or asking for private details? If 2 people report the same person, they are removed.', kb(names.map((a) => [{ text: a, callback_data: `rm:rep:${code}:${a}` }])));
-    }
+    if (act === 'repmenu') return reportMenu(chatId, userId, code);
     if (act === 'rep') {
       const r = rooms.report(code, userId, arg);
       if (!r.ok) return send(chatId, 'I could not report that person. They may have left already.');
       await send(chatId, 'Thanks, I noted your report.');
       if (r.removedId) {
-        await send(r.removedId, '🚫 You were removed from the room after reports from other people.');
+        await send(r.removedId, '🚫 You were removed from the room after reports from other people.', mainMenu());
         const room = rooms.get(code);
         if (room) { await tellRoom(room, F.roomNotice(`${arg} was removed from the room.`)); if (!room.members.size) await closeRoom(code, 'empty'); }
       }
@@ -492,7 +582,7 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
         case '/kaki': return kakiMenu(chatId, userId);
         case '/demo': return demoCommand(chatId, userId); // not in the command menu on purpose
         case '/rooms': return listRooms(chatId, userId);
-        case '/leave': case '/end': return send(chatId, 'You are not in a discussion room.');
+        case '/leave': case '/end': case '/vote': case '/reportperson': return send(chatId, 'You are not in a discussion room.', mainMenu());
         default: return send(chatId, 'I do not know that command. Send me a suspicious message, or tap /start.');
       }
     }
@@ -537,11 +627,7 @@ Type /demo again to turn it off.`, kb([[{ text: '📩 Use a sample scam message'
     if (await tooFast(chatId, userId, tapLimiter)) return;
     const [kind, a, b] = String(q.data || '').split(':');
     if (kind === 'rm') return roomCallback(q, chatId, userId);
-    if (kind === 'demo' && a === 'sample') {
-      if (rooms.roomOf(userId)) return send(chatId, 'You are in a room. Type /leave first.');
-      await send(chatId, `📩 Sample message:\n<pre>${F.esc(DEMO_SAMPLE)}</pre>`);
-      return analyseAndReply(chatId, userId, DEMO_SAMPLE);
-    }
+    if (kind === 'demo') return demoCallback(chatId, userId, a);
     if (kind === 'kk') {
       rooms.setHelper(userId, a === 'on');
       return send(chatId, a === 'on' ? '✅ You are now a Kaki. Thank you! I will ping you when someone needs a second opinion. Type /rooms to see rooms open now.' : 'OK, you are no longer a Kaki and I will not ping you. I removed your ID from the Kaki list.');
